@@ -1,0 +1,24 @@
+[
+  {
+    "date": "2025-11-28",
+    "headline": "NIFTY Bank hits record high on strong earnings",
+    "source": "Economic Times",
+    "url": "https://example.com/news11",
+    "text": "NIFTY Bank index surged to a new all-time high today, gaining 2.8% as major banks reported exceptional quarterly results. HDFC Bank, ICICI Bank, and Axis Bank all beat analyst expectations with strong loan growth and improved margins."
+  },
+  {
+    "date": "2025-11-28",
+    "headline": "IT sector shows resilience despite global headwinds",
+    "source": "Business Standard",
+    "url": "https://example.com/news12",
+    "text": "NIFTY IT demonstrated resilience today, rising 1.2% despite concerns over global tech spending. TCS and Infosys provided positive outlook for digital transformation projects."
+  },
+  {
+    "date": "2025-11-28",
+    "headline": "FMCG companies report strong rural demand",
+    "source": "LiveMint",
+    "url": "https://example.com/news13",
+    "text": "NIFTY FMCG gained 1.5% as companies reported strong rural demand recovery. HUL and Britannia saw significant volume growth in rural markets."
+  }
+]
+

@@ -1,0 +1,51 @@
+"""FastAPI application entry point."""
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from app.api.v1 import sectors, forecasts
+from app.db import models, database
+
+# Create database tables
+models.Base.metadata.create_all(bind=database.engine)
+
+app = FastAPI(
+    title="SectorView API",
+    description="API for Indian market sector analysis and forecasting",
+    version="1.0.0"
+)
+
+# CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://localhost:5173"],  # Vite default port
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include routers
+app.include_router(sectors.router, prefix="/api/v1", tags=["sectors"])
+app.include_router(forecasts.router, prefix="/api/v1", tags=["forecasts"])
+
+
+@app.get("/healthz")
+def health_check():
+    """Health check endpoint."""
+    try:
+        # Simple DB connectivity check
+        db = next(database.get_db())
+        db.execute("SELECT 1")
+        db.close()
+        return {"status": "healthy", "database": "connected"}
+    except Exception as e:
+        return {"status": "unhealthy", "error": str(e)}
+
+
+@app.get("/")
+def root():
+    """Root endpoint."""
+    return {
+        "message": "SectorView API",
+        "version": "1.0.0",
+        "docs": "/docs"
+    }
+

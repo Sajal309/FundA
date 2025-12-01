@@ -1,0 +1,50 @@
+[
+  {
+    "sector_id": "NIFTY_BANK",
+    "date": "2025-11-28",
+    "forecast_3m_label": "UP",
+    "prob_up": 0.72,
+    "prob_neutral": 0.18,
+    "prob_down": 0.10,
+    "expected_return_pct": 4.5,
+    "top_drivers": [
+      {
+        "driver": "FII inflows",
+        "value": 1500000000,
+        "impact": "positive"
+      },
+      {
+        "driver": "MA20>MA50",
+        "value": true,
+        "impact": "positive"
+      },
+      {
+        "driver": "Positive 1-month momentum",
+        "value": "2.5%",
+        "impact": "positive"
+      }
+    ]
+  },
+  {
+    "sector_id": "NIFTY_IT",
+    "date": "2025-11-28",
+    "forecast_3m_label": "NEUTRAL",
+    "prob_up": 0.35,
+    "prob_neutral": 0.60,
+    "prob_down": 0.05,
+    "expected_return_pct": 0.0,
+    "top_drivers": [
+      {
+        "driver": "MA20>MA50",
+        "value": true,
+        "impact": "positive"
+      },
+      {
+        "driver": "Neutral momentum",
+        "value": "0.8%",
+        "impact": "neutral"
+      }
+    ]
+  }
+]
+
