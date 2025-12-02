@@ -14,6 +14,7 @@ Later milestones can extend this to include flows, macro, options, and news.
 """
 from __future__ import annotations
 
+import os
 import json
 from datetime import datetime, date
 from pathlib import Path
@@ -48,7 +49,10 @@ def run_daily_etl(run_date: date | None = None) -> Dict[str, Any]:
 
     try:
         # 1) Ingest EOD sector time-series from sample CSV
+        # Try both paths: relative to project root and absolute /app/sample_data
         sample_csv = Path(__file__).resolve().parents[2] / "sample_data" / "sector_time_series.csv"
+        if not sample_csv.exists():
+            sample_csv = Path("/app/sample_data/sector_time_series.csv")
         if not sample_csv.exists():
             logger.error(f"Sample CSV not found at {sample_csv}")
             summary["steps"]["ingest_eod"] = {
@@ -66,6 +70,8 @@ def run_daily_etl(run_date: date | None = None) -> Dict[str, Any]:
 
         # 2) Ingest FII/DII flows from sample CSV
         flows_csv = Path(__file__).resolve().parents[2] / "sample_data" / "fii_dii_flows.csv"
+        if not flows_csv.exists():
+            flows_csv = Path("/app/sample_data/fii_dii_flows.csv")
         if flows_csv.exists():
             logger.info(f"Starting flows ingestion from {flows_csv}")
             count_flows = ingest_flows.ingest_flows_from_csv(str(flows_csv), db)
@@ -88,6 +94,8 @@ def run_daily_etl(run_date: date | None = None) -> Dict[str, Any]:
 
         # 3) Ingest macro data from sample CSV
         macro_csv = Path(__file__).resolve().parents[2] / "sample_data" / "macro_daily.csv"
+        if not macro_csv.exists():
+            macro_csv = Path("/app/sample_data/macro_daily.csv")
         if macro_csv.exists():
             logger.info(f"Starting macro ingestion from {macro_csv}")
             count_macro = ingest_macro.ingest_macro_from_csv(str(macro_csv), db)
@@ -110,6 +118,8 @@ def run_daily_etl(run_date: date | None = None) -> Dict[str, Any]:
 
         # 4) Ingest options data from sample CSV
         options_csv = Path(__file__).resolve().parents[2] / "sample_data" / "options_daily.csv"
+        if not options_csv.exists():
+            options_csv = Path("/app/sample_data/options_daily.csv")
         if options_csv.exists():
             logger.info(f"Starting options ingestion from {options_csv}")
             count_options = ingest_options.ingest_options_from_csv(str(options_csv), db)
@@ -125,26 +135,58 @@ def run_daily_etl(run_date: date | None = None) -> Dict[str, Any]:
             }
 
         # 5) Ingest news headlines with sentiment scoring
-        news_csv = Path(__file__).resolve().parents[2] / "sample_data" / "news_headlines.csv"
-        if news_csv.exists():
-            logger.info(f"Starting news ingestion from {news_csv}")
-            count_news = ingest_news.ingest_news_from_csv(str(news_csv), db)
-            summary["steps"]["ingest_news"] = {
-                "status": "ok",
-                "records": count_news,
-            }
-            # Aggregate sentiment by sector
-            agg_sentiment_count = ingest_news.aggregate_sentiment_by_sector(db, run_date)
-            summary["steps"]["aggregate_sentiment"] = {
-                "status": "ok",
-                "sectors_processed": agg_sentiment_count,
-            }
-        else:
-            logger.warning(f"News CSV not found at {news_csv}, skipping")
-            summary["steps"]["ingest_news"] = {
-                "status": "skipped",
-                "records": 0,
-            }
+        # Try NewsAPI first if key is available, otherwise use sample CSV
+        from app.config import settings
+        news_api_key = settings.newsapi_key or os.getenv('NEWSAPI_KEY')
+        
+        if news_api_key:
+            try:
+                logger.info("Fetching news from NewsAPI...")
+                from datetime import timedelta
+                from_date = run_date - timedelta(days=7)
+                count_news = ingest_news.ingest_news_from_api(
+                    db, news_api_key, from_date=from_date, to_date=run_date
+                )
+                summary["steps"]["ingest_news"] = {
+                    "status": "ok",
+                    "source": "NewsAPI",
+                    "records": count_news,
+                }
+                # Aggregate sentiment by sector
+                agg_sentiment_count = ingest_news.aggregate_sentiment_by_sector(db, run_date)
+                summary["steps"]["aggregate_sentiment"] = {
+                    "status": "ok",
+                    "sectors_processed": agg_sentiment_count,
+                }
+            except Exception as e:
+                logger.warning(f"NewsAPI fetch failed: {e}, falling back to CSV")
+                news_api_key = None  # Fall through to CSV
+        
+        if not news_api_key:
+            # Fallback to CSV
+            news_csv = Path(__file__).resolve().parents[2] / "sample_data" / "news_headlines.csv"
+            if not news_csv.exists():
+                news_csv = Path("/app/sample_data/news_headlines.csv")
+            if news_csv.exists():
+                logger.info(f"Starting news ingestion from {news_csv}")
+                count_news = ingest_news.ingest_news_from_csv(str(news_csv), db)
+                summary["steps"]["ingest_news"] = {
+                    "status": "ok",
+                    "source": "CSV",
+                    "records": count_news,
+                }
+                # Aggregate sentiment by sector
+                agg_sentiment_count = ingest_news.aggregate_sentiment_by_sector(db, run_date)
+                summary["steps"]["aggregate_sentiment"] = {
+                    "status": "ok",
+                    "sectors_processed": agg_sentiment_count,
+                }
+            else:
+                logger.warning(f"News CSV not found at {news_csv}, skipping")
+                summary["steps"]["ingest_news"] = {
+                    "status": "skipped",
+                    "records": 0,
+                }
 
         # 6) Compute features (now includes flows, macro, options, and sentiment)
         logger.info("Starting feature computation for all sectors (daily ETL)...")

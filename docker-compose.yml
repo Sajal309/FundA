@@ -27,6 +27,7 @@ services:
       DATABASE_URL: postgresql://postgres:password@db:5432/sectorview
       SECRET_KEY: supersecret
       ALCHEMY_ECHO: "false"
+      NEWSAPI_KEY: c7e83904e13941eea773235bea1fa29b
     volumes:
       - ./backend:/app
       - ./sample_data:/app/sample_data

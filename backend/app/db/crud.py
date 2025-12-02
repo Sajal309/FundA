@@ -305,18 +305,24 @@ def get_news_headlines(
     """Get news headlines, optionally filtered by sector and date range."""
     query = db.query(models.NewsHeadline)
     
-    if sector_id:
-        # Filter by sector_tags containing the sector_id
-        query = query.filter(
-            models.NewsHeadline.sector_tags.contains([sector_id])
-        )
-    
     if from_date:
         query = query.filter(models.NewsHeadline.date >= from_date)
     if to_date:
         query = query.filter(models.NewsHeadline.date <= to_date)
     
-    return query.order_by(desc(models.NewsHeadline.date)).limit(limit).all()
+    # Get all results first, then filter by sector in Python
+    # (PostgreSQL JSON filtering can be complex, this is simpler)
+    results = query.order_by(desc(models.NewsHeadline.date)).limit(limit * 10 if sector_id else limit).all()
+    
+    if sector_id:
+        # Filter by sector_tags containing the sector_id
+        filtered = [
+            h for h in results
+            if h.sector_tags and sector_id in h.sector_tags
+        ]
+        return filtered[:limit]
+    
+    return results[:limit]
 
 
 def create_or_update_sector_sentiment_daily(

@@ -1,7 +1,7 @@
 """FastAPI application entry point."""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1 import sectors, forecasts
+from app.api.v1 import sectors, forecasts, metrics
 from app.db import models, database
 
 # Create database tables
@@ -25,15 +25,17 @@ app.add_middleware(
 # Include routers
 app.include_router(sectors.router, prefix="/api/v1", tags=["sectors"])
 app.include_router(forecasts.router, prefix="/api/v1", tags=["forecasts"])
+app.include_router(metrics.router, prefix="/api/v1", tags=["metrics"])
 
 
 @app.get("/healthz")
 def health_check():
     """Health check endpoint."""
+    from sqlalchemy import text
     try:
         # Simple DB connectivity check
         db = next(database.get_db())
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         db.close()
         return {"status": "healthy", "database": "connected"}
     except Exception as e:

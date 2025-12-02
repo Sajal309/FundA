@@ -128,8 +128,8 @@ def compute_features_for_sector(
         # Filter to data up to target_date
         df = df[df.index <= pd.Timestamp(target_date)]
     
-    if len(df) < 20:
-        logger.warning(f"Insufficient data for {sector_id}: need at least 20 days, got {len(df)}")
+    if len(df) < 10:
+        logger.warning(f"Insufficient data for {sector_id}: need at least 10 days, got {len(df)}")
         return None
     
     # Calculate features
@@ -152,7 +152,10 @@ def compute_features_for_sector(
     
     # Get macro data for this date
     macro_data = crud.get_macro_daily(db, feature_date)
-    brent_pct_change_7d = macro_data.brent_pct_change_7d if macro_data else None
+    brent_pct_change_7d = None
+    if macro_data:
+        # Access attribute safely - it might not exist if migration didn't run or data is old
+        brent_pct_change_7d = getattr(macro_data, 'brent_pct_change_7d', None)
     
     # Get options data for this sector/date
     # Map sector_id to option underlying (e.g., NIFTY_BANK -> BANKNIFTY, NIFTY_IT -> NIFTY)

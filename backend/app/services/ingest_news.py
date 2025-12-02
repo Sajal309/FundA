@@ -1,4 +1,5 @@
 """News headline ingestion service with sentiment scoring."""
+import os
 import pandas as pd
 import json
 import sys
@@ -225,48 +226,182 @@ def aggregate_sentiment_by_sector(db: Session, target_date: Optional[date] = Non
     return count
 
 
-def fetch_news_from_api(api_key: Optional[str] = None, keywords: List[str] = None) -> List[dict]:
+def fetch_news_from_api(
+    api_key: Optional[str] = None,
+    keywords: List[str] = None,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None
+) -> List[dict]:
     """
-    Fetch news from NewsAPI (placeholder for production).
+    Fetch news from NewsAPI.
     
     Args:
-        api_key: NewsAPI API key
+        api_key: NewsAPI API key (get from https://newsapi.org/)
         keywords: List of keywords to search for
+        from_date: Start date for news
+        to_date: End date for news
         
     Returns:
         List of news articles
     """
-    # TODO: Implement NewsAPI integration
-    # import requests
-    # url = f"https://newsapi.org/v2/everything?q={'+'.join(keywords)}&apiKey={api_key}"
-    logger.warning("fetch_news_from_api not implemented yet")
-    return []
+    if not api_key:
+        logger.warning("NewsAPI key not provided. Set NEWSAPI_KEY environment variable.")
+        return []
+    
+    try:
+        import requests
+        
+        # NewsAPI endpoint
+        url = "https://newsapi.org/v2/everything"
+        
+        # Build query
+        query = " OR ".join(keywords) if keywords else "India stock market"
+        
+        params = {
+            'q': query,
+            'apiKey': api_key,
+            'language': 'en',
+            'sortBy': 'publishedAt',
+            'pageSize': 100,
+        }
+        
+        if from_date:
+            params['from'] = from_date.isoformat()
+        if to_date:
+            params['to'] = to_date.isoformat()
+        
+        response = requests.get(url, params=params, timeout=10)
+        
+        if response.status_code == 200:
+            data = response.json()
+            articles = data.get('articles', [])
+            logger.info(f"Fetched {len(articles)} articles from NewsAPI")
+            return articles
+        elif response.status_code == 401:
+            logger.error("NewsAPI authentication failed. Check your API key.")
+            return []
+        else:
+            logger.warning(f"NewsAPI returned status {response.status_code}")
+            return []
+            
+    except ImportError:
+        logger.warning("requests library not installed")
+        return []
+    except Exception as e:
+        logger.error(f"Error fetching news from NewsAPI: {e}")
+        return []
+
+
+def ingest_news_from_api(
+    db: Session,
+    api_key: Optional[str] = None,
+    keywords: Optional[List[str]] = None,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None
+) -> int:
+    """
+    Fetch news from NewsAPI and ingest into database.
+    
+    Args:
+        db: Database session
+        api_key: NewsAPI API key
+        keywords: Keywords to search (defaults to Indian market keywords)
+        from_date: Start date
+        to_date: End date
+        
+    Returns:
+        Number of records ingested
+    """
+    if keywords is None:
+        keywords = [
+            'NIFTY', 'BSE', 'Sensex', 'Indian stock market',
+            'Indian banks', 'Indian IT', 'Indian pharma'
+        ]
+    
+    articles = fetch_news_from_api(api_key, keywords, from_date, to_date)
+    
+    count = 0
+    for article in articles:
+        try:
+            # Parse published date
+            published_str = article.get('publishedAt', '')
+            if published_str:
+                published_date = datetime.fromisoformat(published_str.replace('Z', '+00:00')).date()
+            else:
+                published_date = date.today()
+            
+            # Score sentiment
+            text_to_score = article.get('content') or article.get('title', '')
+            sentiment_score, sentiment_label = score_sentiment_simple(str(text_to_score))
+            
+            # Extract sector tags
+            sector_tags = extract_sector_tags(str(text_to_score), SECTOR_KEYWORDS)
+            
+            headline_data = schemas.NewsHeadlineCreate(
+                date=published_date,
+                headline=article.get('title', ''),
+                source=article.get('source', {}).get('name', 'NewsAPI'),
+                url=article.get('url'),
+                text=article.get('content'),
+                sector_tags=sector_tags if sector_tags else None,
+                sentiment_score=sentiment_score,
+                sentiment_label=sentiment_label
+            )
+            crud.create_news_headline(db, headline_data)
+            count += 1
+            
+        except Exception as e:
+            logger.warning(f"Failed to ingest news article: {e}")
+            continue
+    
+    logger.info(f"Ingested {count} news articles from NewsAPI")
+    return count
 
 
 def main():
     """CLI entrypoint for news ingestion."""
     parser = argparse.ArgumentParser(description='Ingest news headlines with sentiment scoring')
-    parser.add_argument('--source', required=True, help='Path to CSV or JSON file')
+    parser.add_argument('--source', help='Path to CSV or JSON file')
+    parser.add_argument('--api', action='store_true', help='Fetch from NewsAPI instead of file')
     parser.add_argument('--aggregate', action='store_true', help='Aggregate sentiment by sector after ingestion')
     parser.add_argument('--date', help='Specific date to aggregate for (YYYY-MM-DD)')
+    parser.add_argument('--days', type=int, default=7, help='Days to fetch from API (default: 7)')
     
     args = parser.parse_args()
+    
+    if not args.source and not args.api:
+        parser.error("Either --source or --api must be provided")
     
     db = next(database.get_db())
     
     try:
-        file_path = Path(args.source)
-        file_format = args.format if hasattr(args, 'format') else file_path.suffix[1:].lower()
-        
-        if file_format == 'csv' or file_path.suffix.lower() == '.csv':
-            count = ingest_news_from_csv(str(file_path), db)
-            print(f"Ingested {count} news records")
-        elif file_format == 'json' or file_path.suffix.lower() == '.json':
-            count = ingest_news_from_json(str(file_path), db)
-            print(f"Ingested {count} news records")
+        if args.api:
+            # Fetch from NewsAPI
+            from app.config import settings
+            api_key = os.getenv('NEWSAPI_KEY') or settings.newsapi_key
+            if not api_key:
+                logger.error("NewsAPI key required. Set NEWSAPI_KEY env var or in config")
+                sys.exit(1)
+            
+            from datetime import timedelta
+            to_date = date.today()
+            from_date = to_date - timedelta(days=args.days)
+            count = ingest_news_from_api(db, api_key, from_date=from_date, to_date=to_date)
+            print(f"Ingested {count} news records from NewsAPI")
         else:
-            logger.error(f"Unsupported file format: {file_format}")
-            sys.exit(1)
+            # Ingest from file
+            file_path = Path(args.source)
+            file_format = args.format if hasattr(args, 'format') else file_path.suffix[1:].lower()
+            
+            if file_format == 'csv' or file_path.suffix.lower() == '.csv':
+                count = ingest_news_from_csv(str(file_path), db)
+                print(f"Ingested {count} news records")
+            elif file_format == 'json' or file_path.suffix.lower() == '.json':
+                count = ingest_news_from_json(str(file_path), db)
+                print(f"Ingested {count} news records")
+            else:
+                logger.error(f"Unsupported file format: {file_format}")
+                sys.exit(1)
         
         if args.aggregate:
             target_date = None

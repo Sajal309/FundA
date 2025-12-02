@@ -80,12 +80,13 @@ def fetch_macro_from_alpha_vantage(symbol: str, api_key: Optional[str] = None) -
     return pd.DataFrame()
 
 
-def fetch_macro_from_yfinance(symbol: str) -> pd.DataFrame:
+def fetch_macro_from_yfinance(symbol: str, days: int = 30) -> pd.DataFrame:
     """
-    Fetch macro data from yfinance as fallback.
+    Fetch macro data from yfinance.
     
     Args:
         symbol: Symbol (e.g., 'USDINR=X', 'CL=F' for Brent, 'GC=F' for Gold)
+        days: Number of days to fetch
         
     Returns:
         DataFrame with macro data
@@ -93,14 +94,15 @@ def fetch_macro_from_yfinance(symbol: str) -> pd.DataFrame:
     try:
         import yfinance as yf
         ticker = yf.Ticker(symbol)
-        hist = ticker.history(period="1y")
+        hist = ticker.history(period=f"{days}d")
         
         if hist.empty:
+            logger.warning(f"No data from yfinance for {symbol}")
             return pd.DataFrame()
         
         # Convert to our format
         df = pd.DataFrame({
-            'date': hist.index.date,
+            'date': [d.date() for d in hist.index],
             'close': hist['Close'].values,
         })
         
@@ -108,14 +110,84 @@ def fetch_macro_from_yfinance(symbol: str) -> pd.DataFrame:
         df['pct_1d'] = df['close'].pct_change() * 100
         df['pct_7d'] = df['close'].pct_change(periods=7) * 100
         
+        logger.info(f"Fetched {len(df)} records from yfinance for {symbol}")
         return df
         
     except ImportError:
-        logger.warning("yfinance not installed, skipping yfinance fetch")
+        logger.warning("yfinance not installed. Install with: pip install yfinance")
         return pd.DataFrame()
     except Exception as e:
         logger.error(f"Error fetching from yfinance {symbol}: {e}")
         return pd.DataFrame()
+
+
+def fetch_all_macro_from_yfinance(db: Session, days: int = 30) -> int:
+    """
+    Fetch all macro indicators from yfinance and store in database.
+    
+    Args:
+        db: Database session
+        days: Number of days to fetch
+        
+    Returns:
+        Number of records ingested
+    """
+    # Symbol mappings
+    symbols = {
+        'usd_inr': 'INR=X',  # USD/INR
+        'brent': 'CL=F',     # Brent Crude
+        'gold': 'GC=F',      # Gold futures
+        'us_10y': '^TNX',    # US 10Y Treasury yield
+    }
+    
+    total_count = 0
+    
+    for indicator, symbol in symbols.items():
+        try:
+            df = fetch_macro_from_yfinance(symbol, days)
+            
+            if df.empty:
+                continue
+            
+            for _, row in df.iterrows():
+                # Get or create macro record for this date
+                macro = crud.get_macro_daily(db, row['date'])
+                
+                if not macro:
+                    macro_data = schemas.MacroDailyCreate(
+                        date=row['date'],
+                        usd_inr_close=float(row['close']) if indicator == 'usd_inr' else None,
+                        brent_close=float(row['close']) if indicator == 'brent' else None,
+                        gold_close=float(row['close']) if indicator == 'gold' else None,
+                        us_10y_close=float(row['close']) if indicator == 'us_10y' else None,
+                    )
+                    crud.create_or_update_macro_daily(db, macro_data)
+                else:
+                    # Update existing record
+                    if indicator == 'usd_inr':
+                        macro.usd_inr_close = float(row['close'])
+                        macro.usd_inr_pct_1d = float(row['pct_1d']) if pd.notna(row.get('pct_1d')) else None
+                    elif indicator == 'brent':
+                        macro.brent_close = float(row['close'])
+                        macro.brent_pct_7d = float(row['pct_7d']) if pd.notna(row.get('pct_7d')) else None
+                    elif indicator == 'gold':
+                        macro.gold_close = float(row['close'])
+                    elif indicator == 'us_10y':
+                        macro.us_10y_close = float(row['close'])
+                    db.commit()
+                
+                total_count += 1
+            
+            logger.info(f"Ingested {indicator} data from yfinance")
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch {indicator} from yfinance: {e}")
+            continue
+    
+    # Compute percentage changes
+    compute_macro_pct_changes(db)
+    
+    return total_count
 
 
 def compute_macro_pct_changes(db: Session, target_date: Optional[date] = None) -> int:
