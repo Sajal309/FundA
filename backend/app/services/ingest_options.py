@@ -296,15 +296,36 @@ def fetch_options_from_kite(
             logger.warning(f"No option instruments found for {kite_symbol}")
             return {}
         
-        # Get quotes for option instruments
+        # Get OHLC data for option instruments (more reliable than quotes)
         # Kite requires instrument tokens, not symbols
         instrument_tokens = [inst['instrument_token'] for inst in underlying_instruments[:100]]  # Limit to 100
         
         if not instrument_tokens:
             return {}
         
-        # Get quotes (this gives current OI, volume, etc.)
-        quotes = kite.quote(instrument_tokens)
+        # Get OHLC data (this gives current OI, volume, etc.)
+        # Using OHLC instead of quote to avoid permission issues
+        try:
+            quotes = kite.ohlc(instrument_tokens)
+        except Exception as ohlc_error:
+            logger.warning(f"OHLC fetch failed, trying alternative method: {ohlc_error}")
+            # Fallback: use historical data for a few instruments
+            quotes = {}
+            for token in instrument_tokens[:10]:  # Limit to 10 for fallback
+                try:
+                    hist = kite.historical_data(token, target_date.isoformat(), target_date.isoformat(), 'day')
+                    if hist:
+                        quotes[str(token)] = {
+                            'ohlc': {
+                                'open': hist[0].get('open', 0),
+                                'high': hist[0].get('high', 0),
+                                'low': hist[0].get('low', 0),
+                                'close': hist[0].get('close', 0),
+                            },
+                            'volume': hist[0].get('volume', 0),
+                        }
+                except:
+                    continue
         
         # Aggregate data
         total_call_oi = 0
@@ -314,7 +335,23 @@ def fetch_options_from_kite(
         iv_values = []
         
         for token, quote_data in quotes.items():
-            if 'depth' in quote_data and quote_data['depth']:
+            # Handle OHLC format
+            if 'ohlc' in quote_data:
+                ohlc_data = quote_data.get('ohlc', {})
+                volume = quote_data.get('volume', 0) or ohlc_data.get('volume', 0)
+                oi = quote_data.get('oi', 0)  # OI might not be in OHLC
+                
+                # Determine if call or put from instrument
+                instrument = next((inst for inst in underlying_instruments if inst['instrument_token'] == int(token)), None)
+                if instrument:
+                    if instrument['instrument_type'] == 'CE':
+                        total_call_oi += oi if oi > 0 else 0
+                        total_call_volume += volume
+                    elif instrument['instrument_type'] == 'PE':
+                        total_put_oi += oi if oi > 0 else 0
+                        total_put_volume += volume
+            # Handle legacy quote format
+            elif 'depth' in quote_data and quote_data['depth']:
                 oi = quote_data.get('oi', 0)
                 volume = quote_data.get('volume', 0)
                 iv = quote_data.get('last_price', {}).get('iv', None) if isinstance(quote_data.get('last_price'), dict) else None

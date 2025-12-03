@@ -17,7 +17,7 @@ build/
 *.sqlite3
 
 # Environment
-.env
+
 .env.local
 
 # IDE

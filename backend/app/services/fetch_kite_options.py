@@ -151,15 +151,15 @@ def main():
         
         access_token = args.access_token or os.getenv('KITE_ACCESS_TOKEN')
         
-            if args.underlying:
-                success = fetch_and_store_kite_options(
-                    db, args.underlying, target_date, 
-                    access_token=access_token
-                )
-                if success:
-                    print(f"✅ Fetched options data for {args.underlying}")
-                else:
-                    print(f"❌ Failed to fetch options data for {args.underlying}")
+        if args.underlying:
+            success = fetch_and_store_kite_options(
+                db, args.underlying, target_date,
+                access_token=access_token
+            )
+            if success:
+                print(f"✅ Fetched options data for {args.underlying}")
+            else:
+                print(f"❌ Failed to fetch options data for {args.underlying}")
         else:
             count = fetch_all_kite_options(db, target_date)
             print(f"✅ Fetched options data for {count} underlyings")

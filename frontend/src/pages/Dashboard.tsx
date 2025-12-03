@@ -3,6 +3,9 @@ import { useQuery } from 'react-query';
 import { api, SectorSummary, ForecastResponse } from '../api/client';
 import SectorTile from '../components/SectorTile';
 import SectorDetail from '../components/SectorDetail';
+import CorrelationMatrix from '../components/CorrelationMatrix';
+import SectorComparison from '../components/SectorComparison';
+import MarketSummary from '../components/MarketSummary';
 
 function Dashboard() {
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
@@ -63,6 +66,17 @@ function Dashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Market Summary */}
+        <section className="mb-8">
+          <MarketSummary />
+        </section>
+
+        {/* Analytics Overview */}
+        <section className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <CorrelationMatrix lookbackDays={30} />
+          {sectors && <SectorComparison sectors={sectors} />}
+        </section>
+
         {/* Sector Heatmap */}
         <section className="mb-8">
           <h2 className="text-xl font-semibold mb-4">Sector Performance</h2>
