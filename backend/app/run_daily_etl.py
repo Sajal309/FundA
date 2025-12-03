@@ -116,23 +116,42 @@ def run_daily_etl(run_date: date | None = None) -> Dict[str, Any]:
                 "records": 0,
             }
 
-        # 4) Ingest options data from sample CSV
-        options_csv = Path(__file__).resolve().parents[2] / "sample_data" / "options_daily.csv"
-        if not options_csv.exists():
-            options_csv = Path("/app/sample_data/options_daily.csv")
-        if options_csv.exists():
-            logger.info(f"Starting options ingestion from {options_csv}")
-            count_options = ingest_options.ingest_options_from_csv(str(options_csv), db)
-            summary["steps"]["ingest_options"] = {
-                "status": "ok",
-                "records": count_options,
-            }
-        else:
-            logger.warning(f"Options CSV not found at {options_csv}, skipping")
-            summary["steps"]["ingest_options"] = {
-                "status": "skipped",
-                "records": 0,
-            }
+        # 4) Ingest options data (try Kite first, fallback to CSV)
+        kite_access_token = os.getenv('KITE_ACCESS_TOKEN')
+        
+        if kite_access_token:
+            try:
+                from app.services.fetch_kite_options import fetch_all_kite_options
+                logger.info("Fetching options data from Kite Connect...")
+                count_options = fetch_all_kite_options(db, run_date)
+                summary["steps"]["ingest_options"] = {
+                    "status": "ok",
+                    "source": "Kite Connect",
+                    "underlyings_processed": count_options,
+                }
+            except Exception as e:
+                logger.warning(f"Kite options fetch failed: {e}, falling back to CSV")
+                kite_access_token = None  # Fall through to CSV
+        
+        if not kite_access_token:
+            # Fallback to CSV
+            options_csv = Path(__file__).resolve().parents[2] / "sample_data" / "options_daily.csv"
+            if not options_csv.exists():
+                options_csv = Path("/app/sample_data/options_daily.csv")
+            if options_csv.exists():
+                logger.info(f"Starting options ingestion from {options_csv}")
+                count_options = ingest_options.ingest_options_from_csv(str(options_csv), db)
+                summary["steps"]["ingest_options"] = {
+                    "status": "ok",
+                    "source": "CSV",
+                    "records": count_options,
+                }
+            else:
+                logger.warning(f"Options CSV not found at {options_csv}, skipping")
+                summary["steps"]["ingest_options"] = {
+                    "status": "skipped",
+                    "records": 0,
+                }
 
         # 5) Ingest news headlines with sentiment scoring
         # Try NewsAPI first if key is available, otherwise use sample CSV

@@ -233,25 +233,134 @@ def ingest_options_from_json(file_path: str, db: Session) -> int:
         raise
 
 
-def fetch_options_from_kite(underlying: str, target_date: date, api_key: Optional[str] = None) -> dict:
+def fetch_options_from_kite(
+    underlying: str,
+    target_date: Optional[date] = None,
+    api_key: Optional[str] = None,
+    api_secret: Optional[str] = None,
+    access_token: Optional[str] = None
+) -> dict:
     """
-    Fetch option chain from Kite Connect API (placeholder for production).
+    Fetch option chain from Kite Connect API.
     
     Args:
         underlying: Underlying symbol (e.g., 'NIFTY', 'BANKNIFTY')
-        target_date: Trading date
+        target_date: Trading date (defaults to today)
         api_key: Kite Connect API key
+        api_secret: Kite Connect API secret
+        access_token: Kite Connect access token (required for authenticated requests)
         
     Returns:
         Dictionary with option chain data
     """
-    # TODO: Implement Kite Connect API integration
-    # from kiteconnect import KiteConnect
-    # kite = KiteConnect(api_key=api_key)
-    # instruments = kite.instruments("NFO")
-    # option_chain = kite.option_chain(underlying)
-    logger.warning(f"fetch_options_from_kite not implemented yet for {underlying} on {target_date}")
-    return {}
+    if target_date is None:
+        target_date = date.today()
+    
+    try:
+        from kiteconnect import KiteConnect
+        
+        if not api_key:
+            logger.error("Kite API key required")
+            return {}
+        
+        kite = KiteConnect(api_key=api_key)
+        
+        # If access token is provided, set it
+        if access_token:
+            kite.set_access_token(access_token)
+        else:
+            logger.warning("Kite access token not provided. You need to authenticate first.")
+            logger.info("To get access token, visit: https://kite.trade/connect/login?api_key={}".format(api_key))
+            return {}
+        
+        # Map underlying to Kite instrument token
+        # NIFTY and BANKNIFTY are index options
+        underlying_map = {
+            'NIFTY': 'NIFTY',
+            'BANKNIFTY': 'BANKNIFTY',
+            'NIFTY_BANK': 'BANKNIFTY',  # Map sector to index
+        }
+        
+        kite_symbol = underlying_map.get(underlying, underlying)
+        
+        # Get instruments for NFO (NSE Futures & Options)
+        instruments = kite.instruments("NFO")
+        
+        # Filter for the underlying
+        underlying_instruments = [
+            inst for inst in instruments
+            if inst['name'] == kite_symbol and inst['instrument_type'] in ['CE', 'PE']
+        ]
+        
+        if not underlying_instruments:
+            logger.warning(f"No option instruments found for {kite_symbol}")
+            return {}
+        
+        # Get quotes for option instruments
+        # Kite requires instrument tokens, not symbols
+        instrument_tokens = [inst['instrument_token'] for inst in underlying_instruments[:100]]  # Limit to 100
+        
+        if not instrument_tokens:
+            return {}
+        
+        # Get quotes (this gives current OI, volume, etc.)
+        quotes = kite.quote(instrument_tokens)
+        
+        # Aggregate data
+        total_call_oi = 0
+        total_put_oi = 0
+        total_call_volume = 0
+        total_put_volume = 0
+        iv_values = []
+        
+        for token, quote_data in quotes.items():
+            if 'depth' in quote_data and quote_data['depth']:
+                oi = quote_data.get('oi', 0)
+                volume = quote_data.get('volume', 0)
+                iv = quote_data.get('last_price', {}).get('iv', None) if isinstance(quote_data.get('last_price'), dict) else None
+                
+                # Determine if call or put from instrument
+                instrument = next((inst for inst in underlying_instruments if inst['instrument_token'] == int(token)), None)
+                if instrument:
+                    if instrument['instrument_type'] == 'CE':
+                        total_call_oi += oi
+                        total_call_volume += volume
+                    elif instrument['instrument_type'] == 'PE':
+                        total_put_oi += oi
+                        total_put_volume += volume
+                    
+                    if iv:
+                        iv_values.append(iv)
+        
+        # Calculate average IV
+        iv_index = sum(iv_values) / len(iv_values) if iv_values else None
+        
+        # Get nearest expiry (simplified - would need to parse from instrument names)
+        nearest_expiry = None
+        if underlying_instruments:
+            # Extract expiry from first instrument's tradingsymbol
+            # Format: NIFTY25DEC19400CE or similar
+            first_symbol = underlying_instruments[0].get('tradingsymbol', '')
+            # This is simplified - actual parsing would extract date from symbol
+            nearest_expiry = target_date  # Placeholder
+        
+        return {
+            'date': target_date,
+            'underlying': underlying,
+            'expiry': nearest_expiry,
+            'total_call_oi': total_call_oi if total_call_oi > 0 else None,
+            'total_put_oi': total_put_oi if total_put_oi > 0 else None,
+            'total_call_volume': total_call_volume if total_call_volume > 0 else None,
+            'total_put_volume': total_put_volume if total_put_volume > 0 else None,
+            'iv_index': iv_index,
+        }
+        
+    except ImportError:
+        logger.warning("kiteconnect not installed. Install with: pip install kiteconnect")
+        return {}
+    except Exception as e:
+        logger.error(f"Error fetching options from Kite for {underlying}: {e}")
+        return {}
 
 
 def main():

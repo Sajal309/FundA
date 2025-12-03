@@ -14,12 +14,15 @@ def main():
     parser = argparse.ArgumentParser(description='Fetch real data from external APIs')
     parser.add_argument('--macro', action='store_true', help='Fetch macro data from yfinance')
     parser.add_argument('--news', action='store_true', help='Fetch news from NewsAPI')
+    parser.add_argument('--options', action='store_true', help='Fetch options data from Kite Connect')
     parser.add_argument('--days', type=int, default=30, help='Number of days to fetch (default: 30)')
     parser.add_argument('--news-api-key', help='NewsAPI key (or set NEWSAPI_KEY env var)')
+    parser.add_argument('--kite-access-token', help='Kite access token (or set KITE_ACCESS_TOKEN env var)')
+    parser.add_argument('--underlying', help='Specific underlying for options (e.g., NIFTY, BANKNIFTY)')
     
     args = parser.parse_args()
     
-    if not args.macro and not args.news:
+    if not args.macro and not args.news and not args.options:
         parser.print_help()
         sys.exit(1)
     
@@ -48,6 +51,32 @@ def main():
             from app.services.ingest_news import aggregate_sentiment_by_sector
             agg_count = aggregate_sentiment_by_sector(db, to_date)
             print(f"✅ Aggregated sentiment for {agg_count} sectors")
+        
+        if args.options:
+            from app.services.fetch_kite_options import fetch_all_kite_options, fetch_and_store_kite_options
+            from app.config import settings
+            
+            access_token = args.kite_access_token or os.getenv('KITE_ACCESS_TOKEN')
+            if not access_token:
+                logger.error("Kite access token required. Set KITE_ACCESS_TOKEN env var or use --kite-access-token")
+                logger.info("To get access token, visit: https://kite.trade/connect/login?api_key={}".format(
+                    settings.kite_api_key or os.getenv('KITE_API_KEY', 'your_api_key')
+                ))
+                sys.exit(1)
+            
+            logger.info("Fetching options data from Kite Connect...")
+            if args.underlying:
+                success = fetch_and_store_kite_options(
+                    db, args.underlying, target_date=None, 
+                    access_token=access_token
+                )
+                if success:
+                    print(f"✅ Fetched options data for {args.underlying}")
+                else:
+                    print(f"❌ Failed to fetch options data for {args.underlying}")
+            else:
+                count = fetch_all_kite_options(db)
+                print(f"✅ Fetched options data for {count} underlyings")
         
     except Exception as e:
         logger.error(f"Failed to fetch real data: {e}")

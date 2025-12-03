@@ -1,7 +1,7 @@
 """FastAPI application entry point."""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1 import sectors, forecasts, metrics
+from app.api.v1 import sectors, forecasts, metrics, analytics
 from app.db import models, database
 
 # Create database tables
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(sectors.router, prefix="/api/v1", tags=["sectors"])
 app.include_router(forecasts.router, prefix="/api/v1", tags=["forecasts"])
 app.include_router(metrics.router, prefix="/api/v1", tags=["metrics"])
+app.include_router(analytics.router, prefix="/api/v1", tags=["analytics"])
 
 
 @app.get("/healthz")
