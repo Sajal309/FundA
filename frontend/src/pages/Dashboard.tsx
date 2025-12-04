@@ -6,6 +6,10 @@ import SectorDetail from '../components/SectorDetail';
 import CorrelationMatrix from '../components/CorrelationMatrix';
 import SectorComparison from '../components/SectorComparison';
 import MarketSummary from '../components/MarketSummary';
+import SectorStrengthRanking from '../components/SectorStrengthRanking';
+import MacroIndicators from '../components/MacroIndicators';
+import NewsFeed from '../components/NewsFeed';
+import VolatilityHeatmap from '../components/VolatilityHeatmap';
 
 function Dashboard() {
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
@@ -71,10 +75,26 @@ function Dashboard() {
           <MarketSummary />
         </section>
 
+        {/* Macro Indicators */}
+        <section className="mb-8">
+          <MacroIndicators />
+        </section>
+
         {/* Analytics Overview */}
         <section className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
           <CorrelationMatrix lookbackDays={30} />
           {sectors && <SectorComparison sectors={sectors} />}
+        </section>
+
+        {/* Sector Strength & Volatility */}
+        <section className="mb-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <SectorStrengthRanking lookbackDays={30} />
+          <VolatilityHeatmap lookbackDays={30} />
+        </section>
+
+        {/* News Feed */}
+        <section className="mb-8">
+          <NewsFeed limit={5} />
         </section>
 
         {/* Sector Heatmap */}

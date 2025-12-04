@@ -1,0 +1,53 @@
+# QuarterScore Component Weights
+# These weights determine how much each pillar contributes to the final QuarterScore
+# Total should ideally sum to ~1.0 (macro_overlay can be additive/subtractive)
+
+momentum_1m: 0.10
+momentum_3m: 0.15
+breadth: 0.20
+flows: 0.20
+earnings: 0.15
+valuation: 0.10
+sentiment: 0.05
+macro_overlay: 0.05  # Can be +/- adjustment
+
+# Sector sensitivity to macro factors
+# Used to determine macro overlay impact
+sector_macro_sensitivity:
+  NIFTY_IT:
+    usd_inr: 0.3      # IT benefits from weaker INR
+    rates: -0.2       # Higher rates negative
+    crude: 0.0
+  NIFTY_PHARMA:
+    usd_inr: 0.2
+    rates: -0.1
+    crude: 0.0
+  NIFTY_AUTO:
+    usd_inr: -0.1
+    rates: -0.3       # Higher rates hurt auto demand
+    crude: -0.2       # Higher crude negative
+  NIFTY_BANK:
+    usd_inr: 0.0
+    rates: 0.3        # Banks benefit from higher rates
+    crude: 0.0
+  NIFTY_FMCG:
+    usd_inr: -0.1
+    rates: -0.2
+    crude: -0.1
+  NIFTY_ENERGY:
+    usd_inr: 0.0
+    rates: 0.0
+    crude: 0.4        # Energy benefits from higher crude
+  NIFTY_METAL:
+    usd_inr: -0.1
+    rates: -0.2
+    crude: -0.1
+  NIFTY_REALTY:
+    usd_inr: 0.0
+    rates: -0.4       # Realty very sensitive to rates
+    crude: 0.0
+  default:
+    usd_inr: 0.0
+    rates: 0.0
+    crude: 0.0
+

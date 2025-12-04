@@ -90,6 +90,55 @@ export interface SentimentAnalysis {
   }>;
 }
 
+export interface PerformanceMetrics {
+  annualized_return: number;
+  volatility: number;
+  sharpe_ratio: number;
+  max_drawdown: number;
+  win_rate: number;
+  profit_factor: number;
+  current_rsi: number | null;
+  total_return: number;
+  avg_daily_return: number;
+}
+
+export interface SectorStrengthRanking {
+  sector_id: string;
+  total_return: number;
+  momentum: number;
+  volatility: number;
+  strength_score: number;
+}
+
+export interface BetaMetrics {
+  beta: number;
+  correlation_to_market: number;
+  alpha: number;
+  market_return: number;
+  sector_return: number;
+}
+
+export interface MacroSummary {
+  usd_inr: number | null;
+  usd_inr_change_pct: number | null;
+  brent_crude: number | null;
+  brent_change_pct: number | null;
+  gold_price: number | null;
+  gold_change_pct: number | null;
+  us_10y_yield: number | null;
+  us_10y_change: number | null;
+  date: string | null;
+}
+
+export interface NewsHeadline {
+  headline: string;
+  source: string;
+  published_at: string | null;
+  sentiment_score: number | null;
+  sector_tags: string[];
+  url: string | null;
+}
+
 export const api = {
   getSectors: async (): Promise<SectorSummary[]> => {
     const response = await client.get('/api/v1/sectors');
@@ -146,6 +195,41 @@ export const api = {
     const response = await client.get('/api/v1/analytics/correlations', {
       params: { lookback_days: lookbackDays },
     });
+    return response.data;
+  },
+
+  getPerformanceMetrics: async (sectorId: string, lookbackDays: number = 252): Promise<PerformanceMetrics> => {
+    const response = await client.get(`/api/v1/analytics/sectors/${sectorId}/performance`, {
+      params: { lookback_days: lookbackDays },
+    });
+    return response.data;
+  },
+
+  getSectorStrengthRanking: async (lookbackDays: number = 30): Promise<{ rankings: SectorStrengthRanking[] }> => {
+    const response = await client.get('/api/v1/analytics/sectors/strength-ranking', {
+      params: { lookback_days: lookbackDays },
+    });
+    return response.data;
+  },
+
+  getBetaAndCorrelation: async (sectorId: string, marketSectorId: string = 'NIFTY_50', lookbackDays: number = 252): Promise<BetaMetrics> => {
+    const response = await client.get(`/api/v1/analytics/sectors/${sectorId}/beta`, {
+      params: { market_sector_id: marketSectorId, lookback_days: lookbackDays },
+    });
+    return response.data;
+  },
+
+  getMacroSummary: async (lookbackDays: number = 30): Promise<MacroSummary> => {
+    const response = await client.get('/api/v1/analytics/macro/summary', {
+      params: { lookback_days: lookbackDays },
+    });
+    return response.data;
+  },
+
+  getLatestNews: async (sectorId?: string, limit: number = 10): Promise<{ headlines: NewsHeadline[] }> => {
+    const params: any = { limit };
+    if (sectorId) params.sector_id = sectorId;
+    const response = await client.get('/api/v1/analytics/news/latest', { params });
     return response.data;
   },
 };

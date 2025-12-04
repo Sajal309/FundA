@@ -345,3 +345,329 @@ def get_sentiment_analysis(
         ],
     }
 
+
+def calculate_performance_metrics(
+    db: Session,
+    sector_id: str,
+    lookback_days: int = 252
+) -> Dict[str, any]:
+    """
+    Calculate performance metrics for a sector (Sharpe ratio, max drawdown, win rate, etc.).
+    
+    Args:
+        db: Database session
+        sector_id: Sector identifier
+        lookback_days: Number of days to analyze (default 252 = 1 year)
+        
+    Returns:
+        Dictionary with performance metrics
+    """
+    to_date = date.today()
+    from_date = to_date - timedelta(days=lookback_days)
+    
+    timeseries = crud.get_sector_timeseries(
+        db, sector_id, from_date=from_date, to_date=to_date, limit=1000
+    )
+    
+    if len(timeseries) < 20:
+        return {}
+    
+    # Convert to DataFrame
+    df = pd.DataFrame([{
+        'date': ts.ts.date(),
+        'close': float(ts.close),
+    } for ts in reversed(timeseries)])
+    
+    df['returns'] = df['close'].pct_change()
+    df = df.dropna()
+    
+    if len(df) < 10:
+        return {}
+    
+    returns_series = df['returns']
+    
+    # Annualized return
+    total_return = (df['close'].iloc[-1] / df['close'].iloc[0] - 1)
+    annualized_return = (1 + total_return) ** (252 / len(df)) - 1
+    
+    # Volatility (annualized)
+    volatility = returns_series.std() * np.sqrt(252)
+    
+    # Sharpe ratio (assuming risk-free rate = 0.05 = 5%)
+    risk_free_rate = 0.05
+    sharpe_ratio = (annualized_return - risk_free_rate) / volatility if volatility > 0 else 0
+    
+    # Max drawdown
+    cumulative = (1 + returns_series).cumprod()
+    running_max = cumulative.expanding().max()
+    drawdown = (cumulative - running_max) / running_max
+    max_drawdown = drawdown.min()
+    
+    # Win rate
+    positive_days = (returns_series > 0).sum()
+    win_rate = positive_days / len(returns_series) if len(returns_series) > 0 else 0
+    
+    # Average win vs average loss
+    wins = returns_series[returns_series > 0]
+    losses = returns_series[returns_series < 0]
+    avg_win = wins.mean() if len(wins) > 0 else 0
+    avg_loss = losses.mean() if len(losses) > 0 else 0
+    profit_factor = abs(avg_win / avg_loss) if avg_loss != 0 else 0
+    
+    # RSI calculation
+    delta = df['close'].diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+    rs = gain / loss
+    rsi = 100 - (100 / (1 + rs))
+    current_rsi = rsi.iloc[-1] if not pd.isna(rsi.iloc[-1]) else None
+    
+    return {
+        "annualized_return": float(annualized_return),
+        "volatility": float(volatility),
+        "sharpe_ratio": float(sharpe_ratio),
+        "max_drawdown": float(max_drawdown),
+        "win_rate": float(win_rate),
+        "profit_factor": float(profit_factor),
+        "current_rsi": float(current_rsi) if current_rsi is not None else None,
+        "total_return": float(total_return),
+        "avg_daily_return": float(returns_series.mean()),
+    }
+
+
+def calculate_sector_strength_ranking(
+    db: Session,
+    lookback_days: int = 30
+) -> List[Dict[str, any]]:
+    """
+    Rank sectors by relative strength (momentum + returns).
+    
+    Args:
+        db: Database session
+        lookback_days: Number of days to analyze
+        
+    Returns:
+        List of sectors ranked by strength
+    """
+    to_date = date.today()
+    from_date = to_date - timedelta(days=lookback_days)
+    
+    sector_ids = crud.get_all_sectors(db)
+    rankings = []
+    
+    for sector_id in sector_ids:
+        timeseries = crud.get_sector_timeseries(
+            db, sector_id, from_date=from_date, to_date=to_date, limit=1000
+        )
+        
+        if len(timeseries) < 5:
+            continue
+        
+        df = pd.DataFrame([{
+            'close': float(ts.close),
+        } for ts in reversed(timeseries)])
+        
+        # Calculate metrics
+        total_return = (df['close'].iloc[-1] / df['close'].iloc[0] - 1) * 100
+        returns = df['close'].pct_change().dropna()
+        volatility = returns.std() * np.sqrt(252) * 100
+        
+        # Momentum score (recent performance)
+        recent_returns = returns.tail(5).mean() * 100 if len(returns) >= 5 else 0
+        
+        # Strength score (combination of return and momentum, penalize volatility)
+        strength_score = total_return * 0.6 + recent_returns * 0.4 - volatility * 0.1
+        
+        rankings.append({
+            "sector_id": sector_id,
+            "total_return": float(total_return),
+            "momentum": float(recent_returns),
+            "volatility": float(volatility),
+            "strength_score": float(strength_score),
+        })
+    
+    # Sort by strength score
+    rankings.sort(key=lambda x: x["strength_score"], reverse=True)
+    
+    return rankings
+
+
+def calculate_beta_and_correlation_to_market(
+    db: Session,
+    sector_id: str,
+    market_sector_id: str = "NIFTY_50",
+    lookback_days: int = 252
+) -> Dict[str, any]:
+    """
+    Calculate beta and correlation to market (NIFTY 50).
+    
+    Args:
+        db: Database session
+        sector_id: Sector identifier
+        market_sector_id: Market index (default NIFTY_50)
+        lookback_days: Number of days to analyze
+        
+    Returns:
+        Dictionary with beta and correlation metrics
+    """
+    to_date = date.today()
+    from_date = to_date - timedelta(days=lookback_days)
+    
+    # Get sector returns
+    sector_ts = crud.get_sector_timeseries(
+        db, sector_id, from_date=from_date, to_date=to_date, limit=1000
+    )
+    market_ts = crud.get_sector_timeseries(
+        db, market_sector_id, from_date=from_date, to_date=to_date, limit=1000
+    )
+    
+    if len(sector_ts) < 20 or len(market_ts) < 20:
+        return {}
+    
+    # Convert to DataFrames
+    sector_df = pd.DataFrame([{
+        'date': ts.ts.date(),
+        'close': float(ts.close),
+    } for ts in reversed(sector_ts)])
+    
+    market_df = pd.DataFrame([{
+        'date': ts.ts.date(),
+        'close': float(ts.close),
+    } for ts in reversed(market_ts)])
+    
+    # Calculate returns
+    sector_df['returns'] = sector_df['close'].pct_change()
+    market_df['returns'] = market_df['close'].pct_change()
+    
+    # Merge on date
+    merged = pd.merge(sector_df[['date', 'returns']], market_df[['date', 'returns']], 
+                     on='date', suffixes=('_sector', '_market'))
+    merged = merged.dropna()
+    
+    if len(merged) < 20:
+        return {}
+    
+    sector_returns = merged['returns_sector'].values
+    market_returns = merged['returns_market'].values
+    
+    # Calculate correlation
+    correlation = np.corrcoef(sector_returns, market_returns)[0, 1]
+    
+    # Calculate beta (covariance / market variance)
+    covariance = np.cov(sector_returns, market_returns)[0, 1]
+    market_variance = np.var(market_returns)
+    beta = covariance / market_variance if market_variance > 0 else 0
+    
+    # Alpha (excess return adjusted for beta)
+    sector_mean = sector_returns.mean() * 252  # Annualized
+    market_mean = market_returns.mean() * 252
+    alpha = sector_mean - (beta * market_mean)
+    
+    return {
+        "beta": float(beta),
+        "correlation_to_market": float(correlation),
+        "alpha": float(alpha),
+        "market_return": float(market_mean),
+        "sector_return": float(sector_mean),
+    }
+
+
+def get_macro_indicators_summary(
+    db: Session,
+    lookback_days: int = 30
+) -> Dict[str, any]:
+    """
+    Get summary of macro indicators.
+    
+    Args:
+        db: Database session
+        lookback_days: Number of days to analyze
+        
+    Returns:
+        Dictionary with macro indicators summary
+    """
+    to_date = date.today()
+    from_date = to_date - timedelta(days=lookback_days)
+    
+    macro_data = db.query(models.MacroDaily).filter(
+        models.MacroDaily.date >= from_date,
+        models.MacroDaily.date <= to_date
+    ).order_by(models.MacroDaily.date.desc()).limit(lookback_days).all()
+    
+    if not macro_data:
+        return {}
+    
+    # Get latest values
+    latest = macro_data[0] if macro_data else None
+    
+    # Calculate changes
+    usdinr_change = None
+    brent_change = None
+    gold_change = None
+    us10y_change = None
+    
+    if len(macro_data) >= 2:
+        prev = macro_data[-1]
+        if latest.usd_inr_close and prev.usd_inr_close:
+            usdinr_change = ((float(latest.usd_inr_close) - float(prev.usd_inr_close)) / float(prev.usd_inr_close)) * 100
+        if latest.brent_close and prev.brent_close:
+            brent_change = ((float(latest.brent_close) - float(prev.brent_close)) / float(prev.brent_close)) * 100
+        if latest.gold_close and prev.gold_close:
+            gold_change = ((float(latest.gold_close) - float(prev.gold_close)) / float(prev.gold_close)) * 100
+        if latest.us_10y_close and prev.us_10y_close:
+            us10y_change = float(latest.us_10y_close) - float(prev.us_10y_close)
+    
+    return {
+        "usd_inr": float(latest.usd_inr_close) if latest and latest.usd_inr_close else None,
+        "usd_inr_change_pct": float(usdinr_change) if usdinr_change is not None else None,
+        "brent_crude": float(latest.brent_close) if latest and latest.brent_close else None,
+        "brent_change_pct": float(brent_change) if brent_change is not None else None,
+        "gold_price": float(latest.gold_close) if latest and latest.gold_close else None,
+        "gold_change_pct": float(gold_change) if gold_change is not None else None,
+        "us_10y_yield": float(latest.us_10y_close) if latest and latest.us_10y_close else None,
+        "us_10y_change": float(us10y_change) if us10y_change is not None else None,
+        "date": latest.date.isoformat() if latest else None,
+    }
+
+
+def get_latest_news_headlines(
+    db: Session,
+    sector_id: Optional[str] = None,
+    limit: int = 10
+) -> List[Dict[str, any]]:
+    """
+    Get latest news headlines.
+    
+    Args:
+        db: Database session
+        sector_id: Optional sector filter
+        limit: Number of headlines to return
+        
+    Returns:
+        List of news headlines
+    """
+    query = db.query(models.NewsHeadline).order_by(models.NewsHeadline.date.desc())
+    
+    if sector_id:
+        # Filter by sector tags (JSONB contains)
+        # Use Python-side filtering since JSONB LIKE doesn't work well
+        all_headlines = query.limit(limit * 3).all()  # Get more to filter
+        headlines = [
+            h for h in all_headlines
+            if h.sector_tags and sector_id in h.sector_tags
+        ][:limit]
+    else:
+        headlines = query.limit(limit).all()
+    
+    return [
+        {
+            "headline": h.headline,
+            "source": h.source,
+            "published_at": h.date.isoformat() if h.date else None,
+            "sentiment_score": float(h.sentiment_score) if h.sentiment_score is not None else None,
+            "sector_tags": h.sector_tags if h.sector_tags else [],
+            "url": h.url,
+        }
+        for h in headlines
+    ]
+

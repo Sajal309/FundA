@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from app.db import crud, schemas, models
 from app.utils import logger
+from app.services import features_quarter
 
 
 def calculate_rsi(prices: pd.Series, period: int = 14) -> float:
@@ -138,6 +139,8 @@ def compute_features_for_sector(
     ret_1d = calculate_returns(closes, 1)
     ret_5d = calculate_returns(closes, 5)
     ret_1m = calculate_returns(closes, 21)  # ~1 month (21 trading days)
+    ret_3m = calculate_returns(closes, 63) if len(closes) >= 63 else None  # ~3 months
+    ret_6m = calculate_returns(closes, 126) if len(closes) >= 126 else None  # ~6 months
     
     ma20 = calculate_moving_average(closes, 20) if len(closes) >= 20 else None
     ma50 = calculate_moving_average(closes, 50) if len(closes) >= 50 else None
@@ -184,6 +187,26 @@ def compute_features_for_sector(
     sentiment_score_1d = sector_sentiment.sentiment_score_1d if sector_sentiment else None
     sentiment_score_7d = sector_sentiment.sentiment_score_7d if sector_sentiment else None
     
+    # Compute Quarter Outlook features
+    momentum_features = features_quarter.compute_momentum_features(db, sector_id, feature_date)
+    breadth_features = features_quarter.compute_breadth_features(db, sector_id, feature_date)
+    flow_features = features_quarter.compute_flow_features(db, sector_id, feature_date)
+    valuation_features = features_quarter.compute_valuation_features(db, sector_id, feature_date)
+    earnings_features = features_quarter.compute_earnings_features(db, sector_id, feature_date)
+    
+    # Compute QuarterScore
+    quarter_score, contributions = features_quarter.compute_quarter_score(
+        db, sector_id, feature_date,
+        features_dict={
+            'momentum': momentum_features,
+            'breadth': breadth_features,
+            'flows': flow_features,
+            'valuation': valuation_features,
+            'earnings': earnings_features,
+            'sentiment_score_7d': sentiment_score_7d,
+        }
+    )
+    
     # Create features object
     features = schemas.SectorFeaturesCreate(
         sector_id=sector_id,
@@ -191,6 +214,8 @@ def compute_features_for_sector(
         ret_1d=ret_1d,
         ret_5d=ret_5d,
         ret_1m=ret_1m,
+        ret_3m=ret_3m,
+        ret_6m=ret_6m,
         ma20=ma20,
         ma50=ma50,
         rsi=rsi,
@@ -201,7 +226,19 @@ def compute_features_for_sector(
         oi_change_3d=oi_change_3d,
         iv_index=iv_index,
         sentiment_score_1d=sentiment_score_1d,
-        sentiment_score_7d=sentiment_score_7d
+        sentiment_score_7d=sentiment_score_7d,
+        # Quarter Outlook features
+        rel_1m_vs_nifty=momentum_features.get('rel_1m_vs_nifty'),
+        rel_3m_vs_nifty=momentum_features.get('rel_3m_vs_nifty'),
+        breadth_above_50dma=breadth_features.get('breadth_above_50dma'),
+        breadth_3m_highs=breadth_features.get('breadth_3m_highs'),
+        fii_net_inr_20d=flow_features.get('fii_net_inr_20d'),
+        fii_net_inr_percentile=flow_features.get('fii_net_inr_percentile'),
+        valuation_pe=valuation_features.get('valuation_pe'),
+        valuation_pe_percentile=valuation_features.get('valuation_pe_percentile'),
+        earnings_upgrades_pct_60d=earnings_features.get('earnings_upgrades_pct_60d'),
+        earnings_downgrades_pct_60d=earnings_features.get('earnings_downgrades_pct_60d'),
+        quarter_score=quarter_score,
     )
     
     # Save to database

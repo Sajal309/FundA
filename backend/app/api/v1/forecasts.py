@@ -1,9 +1,12 @@
 """Forecast-related API endpoints."""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.db import database, crud
+from typing import List, Dict, Any
+from datetime import date
+from app.db import database, crud, models
 from app.db.schemas import ForecastResponse, ForecastDriver
 from app.services import forecasts
+from sqlalchemy import desc
 
 router = APIRouter()
 
@@ -47,7 +50,9 @@ def get_sector_forecast(
         prob_neutral=forecast.prob_neutral,
         prob_down=forecast.prob_down,
         expected_return_pct=forecast.expected_return_pct,
-        top_drivers=drivers
+        top_drivers=drivers,
+        quarter_score=forecast.quarter_score,
+        drivers=forecast.drivers
     )
 
 
@@ -75,4 +80,48 @@ def get_flows(
             ))
     
     return result
+
+
+@router.get("/sectors/quarter-outlook")
+def get_quarter_outlook(
+    db: Session = Depends(database.get_db)
+) -> Dict[str, Any]:
+    """
+    Get Quarter Outlook ranking for all sectors.
+    
+    Returns sectors sorted by quarter_score (descending).
+    """
+    from app.api.v1.sectors import SECTOR_NAMES
+    
+    # Get latest forecasts for all sectors
+    sectors = crud.get_all_sectors(db)
+    sector_forecasts = []
+    
+    for sector_id in sectors:
+        forecast = crud.get_latest_sector_forecast(db, sector_id)
+        if forecast and forecast.quarter_score is not None:
+            sector_forecasts.append({
+                "sector_id": sector_id,
+                "name": SECTOR_NAMES.get(sector_id, sector_id),
+                "quarter_score": forecast.quarter_score,
+                "forecast_3m_label": forecast.forecast_3m_label,
+                "expected_return_pct": forecast.expected_return_pct,
+            })
+    
+    # Sort by quarter_score descending
+    sector_forecasts.sort(key=lambda x: x["quarter_score"], reverse=True)
+    
+    # Get latest date
+    latest_date = None
+    if sector_forecasts:
+        latest_forecast = db.query(models.SectorForecast).order_by(
+            desc(models.SectorForecast.date)
+        ).first()
+        if latest_forecast:
+            latest_date = latest_forecast.date
+    
+    return {
+        "as_of": latest_date.isoformat() if latest_date else date.today().isoformat(),
+        "sectors": sector_forecasts
+    }
 

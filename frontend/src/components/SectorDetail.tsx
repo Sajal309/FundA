@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from 'react-query';
 import { api, TimeseriesPoint, ForecastResponse } from '../api/client';
+import PerformanceMetrics from './PerformanceMetrics';
+import RiskMetrics from './RiskMetrics';
 import {
   LineChart,
   Line,
@@ -144,7 +146,7 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
           {/* Tabs */}
           <div className="mb-6 border-b border-gray-200">
             <nav className="flex space-x-8">
-              {(['overview', 'analytics', 'options', 'sentiment'] as const).map((tab) => (
+              {(['overview', 'analytics', 'options', 'sentiment', 'performance', 'risk'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -506,6 +508,20 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
+            </div>
+          )}
+
+          {/* Performance Tab */}
+          {activeTab === 'performance' && (
+            <div>
+              <PerformanceMetrics sectorId={sectorId} lookbackDays={252} />
+            </div>
+          )}
+
+          {/* Risk Tab */}
+          {activeTab === 'risk' && (
+            <div>
+              <RiskMetrics sectorId={sectorId} marketSectorId="NIFTY_50" lookbackDays={252} />
             </div>
           )}
         </div>

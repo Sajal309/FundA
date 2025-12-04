@@ -48,6 +48,20 @@ class SectorFeaturesBase(BaseModel):
     # Sentiment features
     sentiment_score_1d: Optional[float] = None  # 1-day sentiment score
     sentiment_score_7d: Optional[float] = None  # 7-day rolling sentiment score
+    # Quarter Outlook features
+    ret_3m: Optional[float] = None  # 3-month return
+    ret_6m: Optional[float] = None  # 6-month return
+    rel_1m_vs_nifty: Optional[float] = None  # Sector 1M return - Nifty 1M return
+    rel_3m_vs_nifty: Optional[float] = None  # Sector 3M return - Nifty 3M return
+    breadth_above_50dma: Optional[float] = None  # Proportion of constituents above 50DMA (0-1)
+    breadth_3m_highs: Optional[float] = None  # % making 3-month highs (0-1)
+    fii_net_inr_20d: Optional[float] = None  # Rolling 20-day FII net into sector
+    fii_net_inr_percentile: Optional[float] = None  # Percentile vs last 1 year (0-1)
+    valuation_pe: Optional[float] = None  # Current sector P/E
+    valuation_pe_percentile: Optional[float] = None  # P/E percentile vs 5-year history (0-1)
+    earnings_upgrades_pct_60d: Optional[float] = None  # % of stocks with EPS upgrades last 60 days (0-1)
+    earnings_downgrades_pct_60d: Optional[float] = None  # % of stocks with EPS downgrades last 60 days (0-1)
+    quarter_score: Optional[float] = None  # Final composite QuarterScore metric
 
 
 class SectorFeaturesCreate(SectorFeaturesBase):
@@ -80,6 +94,8 @@ class SectorForecastBase(BaseModel):
     prob_down: float
     expected_return_pct: float
     top_drivers: Optional[List[Dict[str, Any]]] = None
+    quarter_score: Optional[float] = None  # QuarterScore metric
+    drivers: Optional[Dict[str, Dict[str, Any]]] = None  # QuarterScore contributions by pillar
 
 
 class SectorForecastCreate(SectorForecastBase):
@@ -137,6 +153,8 @@ class ForecastResponse(BaseModel):
     prob_down: float
     expected_return_pct: float
     top_drivers: List[ForecastDriver]
+    quarter_score: Optional[float] = None
+    drivers: Optional[Dict[str, Dict[str, Any]]] = None  # QuarterScore contributions
 
 
 class TimeseriesPoint(BaseModel):
@@ -301,6 +319,102 @@ class SectorSentimentDailyCreate(SectorSentimentDailyBase):
 
 class SectorSentimentDailyResponse(SectorSentimentDailyBase):
     """Schema for sector sentiment daily response."""
+    id: int
+    
+    class Config:
+        from_attributes = True
+
+
+# Quarter Outlook schemas
+class SectorBreadthDailyBase(BaseModel):
+    """Base schema for sector breadth daily."""
+    date: date
+    sector_id: str
+    total_constituents: Optional[int] = None
+    above_50dma: Optional[int] = None
+    above_200dma: Optional[int] = None
+    making_3m_highs: Optional[int] = None
+    making_3m_lows: Optional[int] = None
+
+
+class SectorBreadthDailyCreate(SectorBreadthDailyBase):
+    """Schema for creating sector breadth daily."""
+    pass
+
+
+class SectorBreadthDailyResponse(SectorBreadthDailyBase):
+    """Schema for sector breadth daily response."""
+    id: int
+    
+    class Config:
+        from_attributes = True
+
+
+class EarningsEventBase(BaseModel):
+    """Base schema for earnings event."""
+    date: date
+    ticker: str
+    sector_id: Optional[str] = None
+    eps_actual: Optional[float] = None
+    eps_estimate: Optional[float] = None
+    surprise_pct: Optional[float] = None
+    revision_direction: Optional[str] = None  # 'upgrade', 'downgrade', 'none'
+    source: Optional[str] = None
+
+
+class EarningsEventCreate(EarningsEventBase):
+    """Schema for creating earnings event."""
+    pass
+
+
+class EarningsEventResponse(EarningsEventBase):
+    """Schema for earnings event response."""
+    id: int
+    
+    class Config:
+        from_attributes = True
+
+
+class SectorValuationsDailyBase(BaseModel):
+    """Base schema for sector valuations daily."""
+    date: date
+    sector_id: str
+    pe: Optional[float] = None
+    pb: Optional[float] = None
+    div_yield: Optional[float] = None
+
+
+class SectorValuationsDailyCreate(SectorValuationsDailyBase):
+    """Schema for creating sector valuations daily."""
+    pass
+
+
+class SectorValuationsDailyResponse(SectorValuationsDailyBase):
+    """Schema for sector valuations daily response."""
+    id: int
+    
+    class Config:
+        from_attributes = True
+
+
+class MarketSentimentDailyBase(BaseModel):
+    """Base schema for market sentiment daily."""
+    date: date
+    india_vix: Optional[float] = None
+    india_vix_percentile: Optional[float] = None
+    index_pcr: Optional[float] = None
+    breadth_nifty500_above_50dma: Optional[float] = None
+    news_sentiment_score_7d: Optional[float] = None
+    regime_label: Optional[str] = None  # 'RISK-ON', 'NEUTRAL', 'RISK-OFF'
+
+
+class MarketSentimentDailyCreate(MarketSentimentDailyBase):
+    """Schema for creating market sentiment daily."""
+    pass
+
+
+class MarketSentimentDailyResponse(MarketSentimentDailyBase):
+    """Schema for market sentiment daily response."""
     id: int
     
     class Config:

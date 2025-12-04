@@ -4,23 +4,83 @@ from datetime import date
 from sqlalchemy.orm import Session
 from app.db import crud, schemas
 from app.utils import logger
+from app.services import features_quarter
 
 
-def compute_rule_forecast(features: schemas.SectorFeaturesResponse, sector_id: str) -> Dict[str, Any]:
+def compute_rule_forecast(
+    features: schemas.SectorFeaturesResponse, 
+    sector_id: str,
+    db: Optional[Session] = None
+) -> Dict[str, Any]:
     """
     Compute rule-based 3-month forecast for a sector.
+    
+    Uses QuarterScore as primary driver, with additional rule-based adjustments.
     
     Args:
         features: SectorFeaturesResponse object with computed features
         sector_id: Sector identifier (for sector-specific rules)
+        db: Optional database session (needed for QuarterScore computation)
         
     Returns:
         Dictionary with forecast label, probabilities, expected return, and drivers
     """
-    score = 0
-    drivers = []
+    # Use QuarterScore as primary score if available
+    quarter_score = features.quarter_score if features.quarter_score is not None else None
+    contributions = {}
+    use_quarter_score = False
     
-    # Momentum rules
+    # If QuarterScore exists, use it; otherwise fall back to rule-based
+    if quarter_score is not None and db is not None:
+        try:
+            # Get QuarterScore contributions
+            _, contributions = features_quarter.compute_quarter_score(
+                db, sector_id, features.date,
+                features_dict={
+                    'momentum': {
+                        'rel_1m_vs_nifty': features.rel_1m_vs_nifty,
+                        'rel_3m_vs_nifty': features.rel_3m_vs_nifty,
+                    },
+                    'breadth': {
+                        'breadth_above_50dma': features.breadth_above_50dma,
+                        'breadth_3m_highs': features.breadth_3m_highs,
+                    },
+                    'flows': {
+                        'fii_net_inr_percentile': features.fii_net_inr_percentile,
+                    },
+                    'valuation': {
+                        'valuation_pe_percentile': features.valuation_pe_percentile,
+                    },
+                    'earnings': {
+                        'earnings_upgrades_pct_60d': features.earnings_upgrades_pct_60d,
+                        'earnings_downgrades_pct_60d': features.earnings_downgrades_pct_60d,
+                    },
+                    'sentiment_score_7d': features.sentiment_score_7d,
+                }
+            )
+            
+            # Use QuarterScore as base score (scale to similar range as old rule-based)
+            # QuarterScore typically ranges -3 to +3, map to similar scale
+            score = quarter_score * 1.5  # Scale to roughly -4.5 to +4.5
+            drivers = [
+                {
+                    "driver": f"{pillar.capitalize()}",
+                    "value": contrib.get('detail', ''),
+                    "impact": "positive" if contrib.get('score', 0) > 0 else "negative" if contrib.get('score', 0) < 0 else "neutral"
+                }
+                for pillar, contrib in contributions.items()
+            ]
+            use_quarter_score = True
+        except Exception as e:
+            logger.warning(f"Failed to compute QuarterScore for {sector_id}: {e}, falling back to rules")
+            use_quarter_score = False
+    
+    # Fall back to original rule-based approach if QuarterScore not available
+    if not use_quarter_score:
+        score = 0
+        drivers = []
+        
+        # Momentum rules
     if features.ret_1m is not None:
         if features.ret_1m >= 3.0:
             score += 2
@@ -229,7 +289,7 @@ def compute_rule_forecast(features: schemas.SectorFeaturesResponse, sector_id: s
         prob_neutral = prob_neutral / total_prob
         prob_down = prob_down / total_prob
     
-    return {
+    result = {
         "forecast_3m_label": label,
         "prob_up": round(prob_up, 2),
         "prob_neutral": round(prob_neutral, 2),
@@ -237,6 +297,13 @@ def compute_rule_forecast(features: schemas.SectorFeaturesResponse, sector_id: s
         "expected_return_pct": round(expected_return, 2),
         "top_drivers": drivers[:5]  # Top 5 drivers
     }
+    
+    # Add QuarterScore and contributions if available
+    if quarter_score is not None:
+        result["quarter_score"] = round(quarter_score, 2)
+        result["drivers"] = contributions
+    
+    return result
 
 
 def generate_forecast_for_sector(
@@ -267,8 +334,9 @@ def generate_forecast_for_sector(
             return None
         features = crud.get_latest_sector_features(db, sector_id)
     
-    # Compute forecast
-    forecast_data = compute_rule_forecast(schemas.SectorFeaturesResponse.model_validate(features), sector_id)
+    # Compute forecast (pass db for QuarterScore computation)
+    features_response = schemas.SectorFeaturesResponse.model_validate(features)
+    forecast_data = compute_rule_forecast(features_response, sector_id, db=db)
     
     forecast_date = target_date if target_date else features.date
     
@@ -281,7 +349,9 @@ def generate_forecast_for_sector(
         prob_neutral=forecast_data["prob_neutral"],
         prob_down=forecast_data["prob_down"],
         expected_return_pct=forecast_data["expected_return_pct"],
-        top_drivers=forecast_data["top_drivers"]
+        top_drivers=forecast_data.get("top_drivers", []),
+        quarter_score=forecast_data.get("quarter_score"),
+        drivers=forecast_data.get("drivers")
     )
     
     # Save to database

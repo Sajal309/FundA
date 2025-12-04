@@ -108,3 +108,73 @@ def get_sentiment_analysis(
         raise HTTPException(status_code=404, detail=f"No sentiment data found for sector {sector_id}")
     return sentiment
 
+
+@router.get("/analytics/sectors/{sector_id}/performance")
+def get_performance_metrics(
+    sector_id: str,
+    lookback_days: int = Query(252, description="Number of days to analyze (default 252 = 1 year)"),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Get performance metrics for a sector (Sharpe ratio, max drawdown, win rate, RSI, etc.).
+    """
+    metrics = analytics.calculate_performance_metrics(db, sector_id, lookback_days)
+    if not metrics:
+        raise HTTPException(status_code=404, detail=f"No data found for sector {sector_id}")
+    return metrics
+
+
+@router.get("/analytics/sectors/strength-ranking")
+def get_sector_strength_ranking(
+    lookback_days: int = Query(30, description="Number of days to analyze"),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Get sectors ranked by relative strength (momentum + returns).
+    """
+    rankings = analytics.calculate_sector_strength_ranking(db, lookback_days)
+    return {"rankings": rankings}
+
+
+@router.get("/analytics/sectors/{sector_id}/beta")
+def get_beta_and_correlation(
+    sector_id: str,
+    market_sector_id: str = Query("NIFTY_50", description="Market index for comparison"),
+    lookback_days: int = Query(252, description="Number of days to analyze"),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Calculate beta and correlation to market.
+    """
+    metrics = analytics.calculate_beta_and_correlation_to_market(
+        db, sector_id, market_sector_id, lookback_days
+    )
+    if not metrics:
+        raise HTTPException(status_code=404, detail=f"No data found for sector {sector_id}")
+    return metrics
+
+
+@router.get("/analytics/macro/summary")
+def get_macro_summary(
+    lookback_days: int = Query(30, description="Number of days to analyze"),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Get summary of macro indicators (USD/INR, Brent, Gold, US 10Y).
+    """
+    summary = analytics.get_macro_indicators_summary(db, lookback_days)
+    return summary
+
+
+@router.get("/analytics/news/latest")
+def get_latest_news(
+    sector_id: Optional[str] = Query(None, description="Filter by sector"),
+    limit: int = Query(10, description="Number of headlines"),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Get latest news headlines.
+    """
+    headlines = analytics.get_latest_news_headlines(db, sector_id, limit)
+    return {"headlines": headlines}
+

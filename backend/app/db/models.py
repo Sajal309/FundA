@@ -45,6 +45,20 @@ class SectorFeatures(Base):
     # Sentiment features
     sentiment_score_1d = Column(Float, nullable=True)  # 1-day sentiment score
     sentiment_score_7d = Column(Float, nullable=True)  # 7-day rolling sentiment score
+    # Quarter Outlook features
+    ret_3m = Column(Float, nullable=True)  # 3-month return
+    ret_6m = Column(Float, nullable=True)  # 6-month return
+    rel_1m_vs_nifty = Column(Float, nullable=True)  # Sector 1M return - Nifty 1M return
+    rel_3m_vs_nifty = Column(Float, nullable=True)  # Sector 3M return - Nifty 3M return
+    breadth_above_50dma = Column(Float, nullable=True)  # Proportion of constituents above 50DMA (0-1)
+    breadth_3m_highs = Column(Float, nullable=True)  # % making 3-month highs (0-1)
+    fii_net_inr_20d = Column(Numeric(15, 2), nullable=True)  # Rolling 20-day FII net into sector
+    fii_net_inr_percentile = Column(Float, nullable=True)  # Percentile vs last 1 year (0-1)
+    valuation_pe = Column(Float, nullable=True)  # Current sector P/E
+    valuation_pe_percentile = Column(Float, nullable=True)  # P/E percentile vs 5-year history (0-1)
+    earnings_upgrades_pct_60d = Column(Float, nullable=True)  # % of stocks with EPS upgrades last 60 days (0-1)
+    earnings_downgrades_pct_60d = Column(Float, nullable=True)  # % of stocks with EPS downgrades last 60 days (0-1)
+    quarter_score = Column(Float, nullable=True)  # Final composite QuarterScore metric
     
     __table_args__ = (
         UniqueConstraint("sector_id", "date", name="uq_sector_features"),
@@ -64,6 +78,8 @@ class SectorForecast(Base):
     prob_down = Column(Float, nullable=False)
     expected_return_pct = Column(Float, nullable=False)
     top_drivers = Column(JSON, nullable=True)
+    quarter_score = Column(Float, nullable=True)  # QuarterScore metric
+    drivers = Column(JSON, nullable=True)  # QuarterScore contributions by pillar
     
     __table_args__ = (
         UniqueConstraint("sector_id", "date", name="uq_sector_forecasts"),
@@ -186,4 +202,71 @@ class SectorSentimentDaily(Base):
     __table_args__ = (
         UniqueConstraint("sector_id", "date", name="uq_sector_sentiment"),
     )
+
+
+class SectorBreadthDaily(Base):
+    """Daily breadth metrics for sectors."""
+    __tablename__ = "sector_breadth_daily"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    date = Column(Date, nullable=False, index=True)
+    sector_id = Column(String, nullable=False, index=True)
+    total_constituents = Column(Integer, nullable=True)
+    above_50dma = Column(Integer, nullable=True)
+    above_200dma = Column(Integer, nullable=True)
+    making_3m_highs = Column(Integer, nullable=True)
+    making_3m_lows = Column(Integer, nullable=True)
+    
+    __table_args__ = (
+        UniqueConstraint("sector_id", "date", name="uq_sector_breadth"),
+    )
+
+
+class EarningsEvent(Base):
+    """Earnings events and revisions."""
+    __tablename__ = "earnings_events"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    date = Column(Date, nullable=False, index=True)  # Result date
+    ticker = Column(String, nullable=False, index=True)
+    sector_id = Column(String, nullable=True, index=True)
+    eps_actual = Column(Numeric(10, 2), nullable=True)
+    eps_estimate = Column(Numeric(10, 2), nullable=True)
+    surprise_pct = Column(Float, nullable=True)  # (actual - estimate) / estimate
+    revision_direction = Column(String, nullable=True)  # 'upgrade', 'downgrade', 'none'
+    source = Column(String, nullable=True)  # Data source
+    
+    __table_args__ = ()
+
+
+class SectorValuationsDaily(Base):
+    """Daily sector valuation metrics."""
+    __tablename__ = "sector_valuations_daily"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    date = Column(Date, nullable=False, index=True)
+    sector_id = Column(String, nullable=False, index=True)
+    pe = Column(Numeric(10, 2), nullable=True)  # Price-to-Earnings ratio
+    pb = Column(Numeric(10, 2), nullable=True)  # Price-to-Book ratio
+    div_yield = Column(Numeric(6, 4), nullable=True)  # Dividend yield %
+    
+    __table_args__ = (
+        UniqueConstraint("sector_id", "date", name="uq_sector_valuations"),
+    )
+
+
+class MarketSentimentDaily(Base):
+    """Daily market-wide sentiment indicators."""
+    __tablename__ = "market_sentiment_daily"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    date = Column(Date, nullable=False, unique=True, index=True)
+    india_vix = Column(Numeric(6, 2), nullable=True)  # India VIX level
+    india_vix_percentile = Column(Float, nullable=True)  # VIX percentile vs history (0-1)
+    index_pcr = Column(Float, nullable=True)  # Index Put-Call Ratio
+    breadth_nifty500_above_50dma = Column(Float, nullable=True)  # % of Nifty 500 above 50DMA (0-1)
+    news_sentiment_score_7d = Column(Float, nullable=True)  # Overall market news sentiment (0-100)
+    regime_label = Column(String, nullable=True)  # 'RISK-ON', 'NEUTRAL', 'RISK-OFF'
+    
+    __table_args__ = ()
 

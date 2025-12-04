@@ -362,3 +362,98 @@ def get_sector_sentiment_daily(
         query = query.filter(models.SectorSentimentDaily.date == target_date)
     return query.order_by(desc(models.SectorSentimentDaily.date)).first()
 
+
+# Quarter Outlook CRUD functions
+def create_or_update_sector_breadth_daily(
+    db: Session,
+    breadth: schemas.SectorBreadthDailyCreate
+) -> models.SectorBreadthDaily:
+    """Create or update sector breadth daily."""
+    existing = db.query(models.SectorBreadthDaily).filter(
+        models.SectorBreadthDaily.sector_id == breadth.sector_id,
+        models.SectorBreadthDaily.date == breadth.date
+    ).first()
+    
+    if existing:
+        for key, value in breadth.dict(exclude_unset=True).items():
+            setattr(existing, key, value)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    else:
+        db_breadth = models.SectorBreadthDaily(**breadth.dict())
+        db.add(db_breadth)
+        db.commit()
+        db.refresh(db_breadth)
+        return db_breadth
+
+
+def create_earnings_event(
+    db: Session,
+    event: schemas.EarningsEventCreate
+) -> models.EarningsEvent:
+    """Create a new earnings event."""
+    db_event = models.EarningsEvent(**event.dict())
+    db.add(db_event)
+    db.commit()
+    db.refresh(db_event)
+    return db_event
+
+
+def create_or_update_sector_valuations_daily(
+    db: Session,
+    valuation: schemas.SectorValuationsDailyCreate
+) -> models.SectorValuationsDaily:
+    """Create or update sector valuations daily."""
+    existing = db.query(models.SectorValuationsDaily).filter(
+        models.SectorValuationsDaily.sector_id == valuation.sector_id,
+        models.SectorValuationsDaily.date == valuation.date
+    ).first()
+    
+    if existing:
+        for key, value in valuation.dict(exclude_unset=True).items():
+            setattr(existing, key, value)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    else:
+        db_valuation = models.SectorValuationsDaily(**valuation.dict())
+        db.add(db_valuation)
+        db.commit()
+        db.refresh(db_valuation)
+        return db_valuation
+
+
+def create_or_update_market_sentiment_daily(
+    db: Session,
+    sentiment: schemas.MarketSentimentDailyCreate
+) -> models.MarketSentimentDaily:
+    """Create or update market sentiment daily."""
+    existing = db.query(models.MarketSentimentDaily).filter(
+        models.MarketSentimentDaily.date == sentiment.date
+    ).first()
+    
+    if existing:
+        for key, value in sentiment.dict(exclude_unset=True).items():
+            setattr(existing, key, value)
+        db.commit()
+        db.refresh(existing)
+        return existing
+    else:
+        db_sentiment = models.MarketSentimentDaily(**sentiment.dict())
+        db.add(db_sentiment)
+        db.commit()
+        db.refresh(db_sentiment)
+        return db_sentiment
+
+
+def get_market_sentiment_daily(
+    db: Session,
+    target_date: Optional[date] = None
+) -> Optional[models.MarketSentimentDaily]:
+    """Get market sentiment daily for a specific date (or latest)."""
+    query = db.query(models.MarketSentimentDaily)
+    if target_date:
+        query = query.filter(models.MarketSentimentDaily.date == target_date)
+    return query.order_by(desc(models.MarketSentimentDaily.date)).first()
+
