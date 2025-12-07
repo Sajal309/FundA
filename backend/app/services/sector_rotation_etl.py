@@ -472,6 +472,353 @@ def compute_sector_vwap_snapshot(
     return snapshot
 
 
+def compute_industry_breadth_snapshot(
+    db: Session,
+    industry_id: str,
+    target_date: date
+) -> Optional[models.IndustryBreadthSnapshot]:
+    """
+    Compute breadth snapshot for an industry on a given date.
+    
+    Aggregates stock-level technical indicators to industry-level percentages.
+    """
+    # Get all stocks in this industry
+    stocks = db.query(models.Stock).filter(
+        models.Stock.industry_id == industry_id
+    ).all()
+    
+    if not stocks:
+        return None
+    
+    # Get market caps for these stocks on target_date
+    market_caps = db.query(models.StockMarketCap).filter(
+        and_(
+            models.StockMarketCap.ticker.in_([s.ticker for s in stocks]),
+            models.StockMarketCap.date == target_date
+        )
+    ).all()
+    
+    # Get technical indicators
+    indicators = db.query(models.StockTechnicalIndicators).filter(
+        and_(
+            models.StockTechnicalIndicators.ticker.in_([s.ticker for s in stocks]),
+            models.StockTechnicalIndicators.date == target_date
+        )
+    ).all()
+    
+    # Get current prices
+    timeseries = db.query(models.StockTimeSeries).filter(
+        and_(
+            models.StockTimeSeries.ticker.in_([s.ticker for s in stocks]),
+            models.StockTimeSeries.date == target_date
+        )
+    ).all()
+    
+    # Create lookup maps
+    mcap_map = {mc.ticker: float(mc.market_cap) for mc in market_caps}
+    indicator_map = {ind.ticker: ind for ind in indicators}
+    price_map = {ts.ticker: float(ts.close) for ts in timeseries}
+    
+    # Calculate totals
+    total_mcap = sum(mcap_map.values())
+    total_stocks = len(stocks)
+    
+    if total_mcap == 0:
+        return None
+    
+    # Calculate metrics
+    mcap_rs55_gt0 = sum(
+        mcap_map.get(ticker, 0) 
+        for ticker, ind in indicator_map.items() 
+        if ind.rs55 and ind.rs55 > 0
+    )
+    mcap_rsi_gt50 = sum(
+        mcap_map.get(ticker, 0) 
+        for ticker, ind in indicator_map.items() 
+        if ind.rsi14 and ind.rsi14 > 50
+    )
+    mcap_above_sma20 = sum(
+        mcap_map.get(ticker, 0) 
+        for ticker, ind in indicator_map.items() 
+        if ind.sma20 and price_map.get(ticker, 0) > float(ind.sma20)
+    )
+    mcap_above_sma50 = sum(
+        mcap_map.get(ticker, 0) 
+        for ticker, ind in indicator_map.items() 
+        if ind.sma50 and price_map.get(ticker, 0) > float(ind.sma50)
+    )
+    mcap_above_sma100 = sum(
+        mcap_map.get(ticker, 0) 
+        for ticker, ind in indicator_map.items() 
+        if ind.sma100 and price_map.get(ticker, 0) > float(ind.sma100)
+    )
+    
+    # Count-based metrics
+    count_rs55_gt0 = sum(1 for ind in indicator_map.values() if ind.rs55 and ind.rs55 > 0)
+    count_rsi_gt50 = sum(1 for ind in indicator_map.values() if ind.rsi14 and ind.rsi14 > 50)
+    count_above_sma20 = sum(
+        1 for ticker, ind in indicator_map.items() 
+        if ind.sma20 and price_map.get(ticker, 0) > float(ind.sma20)
+    )
+    count_above_sma50 = sum(
+        1 for ticker, ind in indicator_map.items() 
+        if ind.sma50 and price_map.get(ticker, 0) > float(ind.sma50)
+    )
+    count_above_sma100 = sum(
+        1 for ticker, ind in indicator_map.items() 
+        if ind.sma100 and price_map.get(ticker, 0) > float(ind.sma100)
+    )
+    
+    snapshot = models.IndustryBreadthSnapshot(
+        date=target_date,
+        industry_id=industry_id,
+        total_mcap=Decimal(total_mcap),
+        total_stocks=total_stocks,
+        pct_mcap_rs55_gt0=mcap_rs55_gt0 / total_mcap if total_mcap > 0 else 0,
+        pct_mcap_rsi_gt50=mcap_rsi_gt50 / total_mcap if total_mcap > 0 else 0,
+        pct_mcap_above_sma20=mcap_above_sma20 / total_mcap if total_mcap > 0 else 0,
+        pct_mcap_above_sma50=mcap_above_sma50 / total_mcap if total_mcap > 0 else 0,
+        pct_mcap_above_sma100=mcap_above_sma100 / total_mcap if total_mcap > 0 else 0,
+        pct_count_rs55_gt0=count_rs55_gt0 / total_stocks if total_stocks > 0 else 0,
+        pct_count_rsi_gt50=count_rsi_gt50 / total_stocks if total_stocks > 0 else 0,
+        pct_count_above_sma20=count_above_sma20 / total_stocks if total_stocks > 0 else 0,
+        pct_count_above_sma50=count_above_sma50 / total_stocks if total_stocks > 0 else 0,
+        pct_count_above_sma100=count_above_sma100 / total_stocks if total_stocks > 0 else 0,
+    )
+    
+    return snapshot
+
+
+def compute_industry_momentum_score(
+    db: Session,
+    industry_id: str,
+    target_date: date
+) -> Optional[models.IndustryMomentumScore]:
+    """
+    Compute momentum scores for an industry.
+    
+    Calculates market-cap weighted returns over 1M, 3M, 6M and converts to 0-100 scores.
+    """
+    # Get all stocks in industry
+    stocks = db.query(models.Stock).filter(
+        models.Stock.industry_id == industry_id
+    ).all()
+    
+    if not stocks:
+        return None
+    
+    # Get market caps
+    market_caps = db.query(models.StockMarketCap).filter(
+        and_(
+            models.StockMarketCap.ticker.in_([s.ticker for s in stocks]),
+            models.StockMarketCap.date == target_date
+        )
+    ).all()
+    
+    # Get technical indicators with returns
+    indicators = db.query(models.StockTechnicalIndicators).filter(
+        and_(
+            models.StockTechnicalIndicators.ticker.in_([s.ticker for s in stocks]),
+            models.StockTechnicalIndicators.date == target_date
+        )
+    ).all()
+    
+    mcap_map = {mc.ticker: float(mc.market_cap) for mc in market_caps}
+    indicator_map = {ind.ticker: ind for ind in indicators}
+    
+    total_mcap = sum(mcap_map.values())
+    if total_mcap == 0:
+        return None
+    
+    # Calculate weighted returns
+    weighted_return_1m = sum(
+        (mcap_map.get(ticker, 0) / total_mcap) * (ind.return_1m or 0)
+        for ticker, ind in indicator_map.items()
+        if ind.return_1m is not None
+    )
+    weighted_return_3m = sum(
+        (mcap_map.get(ticker, 0) / total_mcap) * (ind.return_3m or 0)
+        for ticker, ind in indicator_map.items()
+        if ind.return_3m is not None
+    )
+    weighted_return_6m = sum(
+        (mcap_map.get(ticker, 0) / total_mcap) * (ind.return_6m or 0)
+        for ticker, ind in indicator_map.items()
+        if ind.return_6m is not None
+    )
+    
+    # Store raw returns - scores will be computed in normalization pass
+    score = models.IndustryMomentumScore(
+        date=target_date,
+        industry_id=industry_id,
+        total_mcap=Decimal(total_mcap),
+        total_stocks=len(stocks),
+        return_1m=weighted_return_1m,
+        return_3m=weighted_return_3m,
+        return_6m=weighted_return_6m,
+        score_1m=None,  # Will be computed in normalization pass
+        score_3m=None,
+        score_6m=None,
+    )
+    
+    return score
+
+
+def compute_industry_delivery_stats(
+    db: Session,
+    industry_id: str,
+    target_date: date
+) -> Optional[models.IndustryDeliveryStats]:
+    """
+    Compute delivery statistics for an industry.
+    """
+    # Get all stocks in industry
+    stocks = db.query(models.Stock).filter(
+        models.Stock.industry_id == industry_id
+    ).all()
+    
+    if not stocks:
+        return None
+    
+    tickers = [s.ticker for s in stocks]
+    
+    # Get today's data
+    today_data = db.query(models.StockTimeSeries).filter(
+        and_(
+            models.StockTimeSeries.ticker.in_(tickers),
+            models.StockTimeSeries.date == target_date
+        )
+    ).all()
+    
+    # Get previous day for MCap change
+    prev_date = target_date - timedelta(days=1)
+    prev_mcaps = db.query(models.StockMarketCap).filter(
+        and_(
+            models.StockMarketCap.ticker.in_(tickers),
+            models.StockMarketCap.date == prev_date
+        )
+    ).all()
+    
+    today_mcaps = db.query(models.StockMarketCap).filter(
+        and_(
+            models.StockMarketCap.ticker.in_(tickers),
+            models.StockMarketCap.date == target_date
+        )
+    ).all()
+    
+    # Get rolling stats
+    rolling_stats = db.query(models.StockRollingStats).filter(
+        and_(
+            models.StockRollingStats.ticker.in_(tickers),
+            models.StockRollingStats.date == target_date
+        )
+    ).all()
+    
+    # Calculate aggregates
+    industry_mcap = sum(float(mc.market_cap) for mc in today_mcaps)
+    prev_industry_mcap = sum(float(mc.market_cap) for mc in prev_mcaps)
+    mcap_change_abs = industry_mcap - prev_industry_mcap
+    mcap_change_pct = (mcap_change_abs / prev_industry_mcap * 100) if prev_industry_mcap > 0 else 0
+    
+    # Traded and delivery values
+    traded_value = sum(float(ts.close) * float(ts.volume) for ts in today_data)
+    delivery_value = sum(
+        float(ts.close) * float(ts.deliverable_volume or 0) 
+        for ts in today_data if ts.deliverable_volume
+    )
+    
+    # Averages from rolling stats
+    traded_value_avg = sum(float(rs.avg_traded_value_20d or 0) for rs in rolling_stats)
+    delivery_value_avg = sum(float(rs.avg_delivery_value_20d or 0) for rs in rolling_stats)
+    
+    traded_value_multiple = (traded_value / traded_value_avg) if traded_value_avg > 0 else 0
+    delivery_value_multiple = (delivery_value / delivery_value_avg) if delivery_value_avg > 0 else 0
+    
+    stats = models.IndustryDeliveryStats(
+        date=target_date,
+        industry_id=industry_id,
+        stocks_count=len(stocks),
+        industry_mcap=Decimal(industry_mcap),
+        industry_mcap_change_abs=Decimal(mcap_change_abs),
+        industry_mcap_change_pct=mcap_change_pct,
+        traded_value=Decimal(traded_value),
+        traded_value_avg=Decimal(traded_value_avg),
+        traded_value_multiple=traded_value_multiple,
+        delivery_value=Decimal(delivery_value) if delivery_value > 0 else None,
+        delivery_value_avg=Decimal(delivery_value_avg) if delivery_value_avg > 0 else None,
+        delivery_value_multiple=delivery_value_multiple if delivery_value_multiple > 0 else None,
+    )
+    
+    return stats
+
+
+def compute_industry_vwap_snapshot(
+    db: Session,
+    industry_id: str,
+    target_date: date
+) -> Optional[models.IndustryVWAPSnapshot]:
+    """
+    Compute VWAP snapshot for an industry.
+    """
+    stocks = db.query(models.Stock).filter(
+        models.Stock.industry_id == industry_id
+    ).all()
+    
+    if not stocks:
+        return None
+    
+    tickers = [s.ticker for s in stocks]
+    
+    # Get market caps
+    market_caps = db.query(models.StockMarketCap).filter(
+        and_(
+            models.StockMarketCap.ticker.in_(tickers),
+            models.StockMarketCap.date == target_date
+        )
+    ).all()
+    
+    # Get price and VWAP data
+    timeseries = db.query(models.StockTimeSeries).filter(
+        and_(
+            models.StockTimeSeries.ticker.in_(tickers),
+            models.StockTimeSeries.date == target_date
+        )
+    ).all()
+    
+    indicators = db.query(models.StockTechnicalIndicators).filter(
+        and_(
+            models.StockTechnicalIndicators.ticker.in_(tickers),
+            models.StockTechnicalIndicators.date == target_date
+        )
+    ).all()
+    
+    mcap_map = {mc.ticker: float(mc.market_cap) for mc in market_caps}
+    price_map = {ts.ticker: float(ts.close) for ts in timeseries}
+    vwap_map = {ind.ticker: float(ind.vwap) for ind in indicators if ind.vwap}
+    
+    total_mcap = sum(mcap_map.values())
+    if total_mcap == 0:
+        return None
+    
+    # Calculate % of mcap where price > VWAP
+    mcap_above_vwap = sum(
+        mcap_map.get(ticker, 0)
+        for ticker in price_map.keys()
+        if ticker in vwap_map and price_map[ticker] > vwap_map[ticker]
+    )
+    
+    pct_mcap_above_vwap = mcap_above_vwap / total_mcap if total_mcap > 0 else 0
+    
+    snapshot = models.IndustryVWAPSnapshot(
+        date=target_date,
+        industry_id=industry_id,
+        total_mcap=Decimal(total_mcap),
+        pct_mcap_price_above_vwap=pct_mcap_above_vwap,
+    )
+    
+    return snapshot
+
+
 def run_daily_aggregation(
     db: Session,
     target_date: Optional[date] = None
@@ -566,8 +913,88 @@ def run_daily_aggregation(
     normalized_count = normalize_momentum_scores(db, target_date, "sector")
     logger.info(f"Normalized {normalized_count} momentum scores")
     
-    # TODO: Also compute for industries if needed
-    # normalize_momentum_scores(db, target_date, "industry")
+    # Process industries
+    industries = db.query(models.Stock.industry_id).distinct().all()
+    industry_ids = [i[0] for i in industries if i[0]]
+    
+    logger.info(f"Computing aggregations for {len(industry_ids)} industries on {target_date}")
+    
+    for industry_id in industry_ids:
+        try:
+            # Breadth
+            breadth = compute_industry_breadth_snapshot(db, industry_id, target_date)
+            if breadth:
+                existing = db.query(models.IndustryBreadthSnapshot).filter(
+                    and_(
+                        models.IndustryBreadthSnapshot.industry_id == industry_id,
+                        models.IndustryBreadthSnapshot.date == target_date
+                    )
+                ).first()
+                if existing:
+                    db.delete(existing)
+                    db.flush()
+                db.add(breadth)
+                count += 1
+            
+            # Momentum
+            momentum = compute_industry_momentum_score(db, industry_id, target_date)
+            if momentum:
+                existing = db.query(models.IndustryMomentumScore).filter(
+                    and_(
+                        models.IndustryMomentumScore.industry_id == industry_id,
+                        models.IndustryMomentumScore.date == target_date
+                    )
+                ).first()
+                if existing:
+                    db.delete(existing)
+                    db.flush()
+                db.add(momentum)
+                count += 1
+            
+            # Deliveries
+            deliveries = compute_industry_delivery_stats(db, industry_id, target_date)
+            if deliveries:
+                existing = db.query(models.IndustryDeliveryStats).filter(
+                    and_(
+                        models.IndustryDeliveryStats.industry_id == industry_id,
+                        models.IndustryDeliveryStats.date == target_date
+                    )
+                ).first()
+                if existing:
+                    db.delete(existing)
+                    db.flush()
+                db.add(deliveries)
+                count += 1
+            
+            # VWAP
+            vwap = compute_industry_vwap_snapshot(db, industry_id, target_date)
+            if vwap:
+                existing = db.query(models.IndustryVWAPSnapshot).filter(
+                    and_(
+                        models.IndustryVWAPSnapshot.industry_id == industry_id,
+                        models.IndustryVWAPSnapshot.date == target_date
+                    )
+                ).first()
+                if existing:
+                    db.delete(existing)
+                    db.flush()
+                db.add(vwap)
+                count += 1
+                
+        except Exception as e:
+            logger.error(f"Error computing aggregations for industry {industry_id}: {e}")
+            continue
+    
+    db.commit()
+    
+    # Normalize momentum scores after all sectors and industries are processed
+    logger.info("Normalizing momentum scores for sectors...")
+    normalized_count = normalize_momentum_scores(db, target_date, "sector")
+    logger.info(f"Normalized {normalized_count} sector momentum scores")
+    
+    logger.info("Normalizing momentum scores for industries...")
+    normalized_count_industry = normalize_momentum_scores(db, target_date, "industry")
+    logger.info(f"Normalized {normalized_count_industry} industry momentum scores")
     
     logger.info(f"✅ Created {count} aggregation snapshots")
     return count

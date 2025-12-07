@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_, desc
 from app.db import models
 from app.utils import logger
+from app.utils.formatting import round_to_2_decimal
 
 
 def get_available_dates(db: Session, level: Literal["sector", "industry"] = "sector") -> List[date]:
@@ -49,7 +50,7 @@ def compute_breadth_metrics(
             models.IndustryBreadthSnapshot.date == target_date
         ).all()
         
-        # Get industry names
+        # Get industry names from Industry table only (not from SECTOR_NAMES)
         industry_names = {}
         industries = db.query(models.Industry).filter(
             models.Industry.industry_id.in_([s.industry_id for s in snapshots])
@@ -57,6 +58,7 @@ def compute_breadth_metrics(
         for ind in industries:
             industry_names[ind.industry_id] = ind.name
         
+        # Fallback for any missing industry names
         for snapshot in snapshots:
             if snapshot.industry_id not in industry_names:
                 industry_names[snapshot.industry_id] = snapshot.industry_id.replace("_", " ").title()
@@ -72,25 +74,25 @@ def compute_breadth_metrics(
         
         if metric_type == "mcap":
             metrics = {
-                "pct_rs55_gt0": snapshot.pct_mcap_rs55_gt0 * 100 if snapshot.pct_mcap_rs55_gt0 else 0,
-                "pct_rsi_gt50": snapshot.pct_mcap_rsi_gt50 * 100 if snapshot.pct_mcap_rsi_gt50 else 0,
-                "pct_above_sma20": snapshot.pct_mcap_above_sma20 * 100 if snapshot.pct_mcap_above_sma20 else 0,
-                "pct_above_sma50": snapshot.pct_mcap_above_sma50 * 100 if snapshot.pct_mcap_above_sma50 else 0,
-                "pct_above_sma100": snapshot.pct_mcap_above_sma100 * 100 if snapshot.pct_mcap_above_sma100 else 0,
+                "pct_rs55_gt0": round_to_2_decimal(snapshot.pct_mcap_rs55_gt0 * 100) if snapshot.pct_mcap_rs55_gt0 else 0.0,
+                "pct_rsi_gt50": round_to_2_decimal(snapshot.pct_mcap_rsi_gt50 * 100) if snapshot.pct_mcap_rsi_gt50 else 0.0,
+                "pct_above_sma20": round_to_2_decimal(snapshot.pct_mcap_above_sma20 * 100) if snapshot.pct_mcap_above_sma20 else 0.0,
+                "pct_above_sma50": round_to_2_decimal(snapshot.pct_mcap_above_sma50 * 100) if snapshot.pct_mcap_above_sma50 else 0.0,
+                "pct_above_sma100": round_to_2_decimal(snapshot.pct_mcap_above_sma100 * 100) if snapshot.pct_mcap_above_sma100 else 0.0,
             }
         else:
             metrics = {
-                "pct_rs55_gt0": snapshot.pct_count_rs55_gt0 * 100 if snapshot.pct_count_rs55_gt0 else 0,
-                "pct_rsi_gt50": snapshot.pct_count_rsi_gt50 * 100 if snapshot.pct_count_rsi_gt50 else 0,
-                "pct_above_sma20": snapshot.pct_count_above_sma20 * 100 if snapshot.pct_count_above_sma20 else 0,
-                "pct_above_sma50": snapshot.pct_count_above_sma50 * 100 if snapshot.pct_count_above_sma50 else 0,
-                "pct_above_sma100": snapshot.pct_count_above_sma100 * 100 if snapshot.pct_count_above_sma100 else 0,
+                "pct_rs55_gt0": round_to_2_decimal(snapshot.pct_count_rs55_gt0 * 100) if snapshot.pct_count_rs55_gt0 else 0.0,
+                "pct_rsi_gt50": round_to_2_decimal(snapshot.pct_count_rsi_gt50 * 100) if snapshot.pct_count_rsi_gt50 else 0.0,
+                "pct_above_sma20": round_to_2_decimal(snapshot.pct_count_above_sma20 * 100) if snapshot.pct_count_above_sma20 else 0.0,
+                "pct_above_sma50": round_to_2_decimal(snapshot.pct_count_above_sma50 * 100) if snapshot.pct_count_above_sma50 else 0.0,
+                "pct_above_sma100": round_to_2_decimal(snapshot.pct_count_above_sma100 * 100) if snapshot.pct_count_above_sma100 else 0.0,
             }
         
         results.append({
             "id": entity_id,
             "name": name,
-            "mcap": float(snapshot.total_mcap) / 10000000,  # Convert to crores
+            "mcap": round_to_2_decimal(float(snapshot.total_mcap) / 10000000) or 0.0,  # Convert to crores
             "stocks": snapshot.total_stocks,
             "metrics": metrics
         })
@@ -128,6 +130,7 @@ def compute_momentum_scores(
             models.IndustryMomentumScore.date == target_date
         ).all()
         
+        # Get industry names from Industry table only
         industry_names = {}
         industries = db.query(models.Industry).filter(
             models.Industry.industry_id.in_([s.industry_id for s in scores])
@@ -135,6 +138,7 @@ def compute_momentum_scores(
         for ind in industries:
             industry_names[ind.industry_id] = ind.name
         
+        # Fallback for any missing industry names
         for score in scores:
             if score.industry_id not in industry_names:
                 industry_names[score.industry_id] = score.industry_id.replace("_", " ").title()
@@ -151,11 +155,11 @@ def compute_momentum_scores(
         results.append({
             "id": entity_id,
             "name": name,
-            "mcap": float(score.total_mcap) / 10000000,  # Convert to crores
+            "mcap": round_to_2_decimal(float(score.total_mcap) / 10000000) or 0.0,  # Convert to crores
             "stocks": score.total_stocks,
-            "score_1m": score.score_1m if score.score_1m is not None else 0,
-            "score_3m": score.score_3m if score.score_3m is not None else 0,
-            "score_6m": score.score_6m if score.score_6m is not None else 0,
+            "score_1m": round_to_2_decimal(score.score_1m) if score.score_1m is not None else 0.0,
+            "score_3m": round_to_2_decimal(score.score_3m) if score.score_3m is not None else 0.0,
+            "score_6m": round_to_2_decimal(score.score_6m) if score.score_6m is not None else 0.0,
         })
     
     # Sort by mcap descending
@@ -186,6 +190,7 @@ def compute_delivery_stats(
             models.IndustryDeliveryStats.date == target_date
         ).all()
         
+        # Get industry names from Industry table only
         industry_names = {}
         industries = db.query(models.Industry).filter(
             models.Industry.industry_id.in_([s.industry_id for s in stats])
@@ -193,6 +198,7 @@ def compute_delivery_stats(
         for ind in industries:
             industry_names[ind.industry_id] = ind.name
         
+        # Fallback for any missing industry names
         for stat in stats:
             if stat.industry_id not in industry_names:
                 industry_names[stat.industry_id] = stat.industry_id.replace("_", " ").title()
@@ -210,15 +216,15 @@ def compute_delivery_stats(
             "id": entity_id,
             "name": name,
             "stocks": stat.stocks_count,
-            "mcap": float(stat.sector_mcap if level == "sector" else stat.industry_mcap) / 10000000,  # Crores
-            "mcap_change_abs": float(stat.sector_mcap_change_abs if level == "sector" else stat.industry_mcap_change_abs) / 10000000 if (stat.sector_mcap_change_abs if level == "sector" else stat.industry_mcap_change_abs) else 0,
-            "mcap_change_pct": stat.sector_mcap_change_pct if level == "sector" else stat.industry_mcap_change_pct or 0,
-            "traded_value": float(stat.traded_value) / 10000000 if stat.traded_value else 0,  # Crores
-            "traded_value_avg": float(stat.traded_value_avg) / 10000000 if stat.traded_value_avg else 0,  # Crores
-            "traded_value_multiple": stat.traded_value_multiple if stat.traded_value_multiple else 0,
-            "delivery_value": float(stat.delivery_value) / 10000000 if stat.delivery_value else 0,  # Crores
-            "delivery_value_avg": float(stat.delivery_value_avg) / 10000000 if stat.delivery_value_avg else 0,  # Crores
-            "delivery_value_multiple": stat.delivery_value_multiple if stat.delivery_value_multiple else 0,
+            "mcap": round_to_2_decimal(float(stat.sector_mcap if level == "sector" else stat.industry_mcap) / 10000000) or 0.0,  # Crores
+            "mcap_change_abs": round_to_2_decimal(float(stat.sector_mcap_change_abs if level == "sector" else stat.industry_mcap_change_abs) / 10000000) if (stat.sector_mcap_change_abs if level == "sector" else stat.industry_mcap_change_abs) else 0.0,
+            "mcap_change_pct": round_to_2_decimal(stat.sector_mcap_change_pct if level == "sector" else stat.industry_mcap_change_pct) or 0.0,
+            "traded_value": round_to_2_decimal(float(stat.traded_value) / 10000000) if stat.traded_value else 0.0,  # Crores
+            "traded_value_avg": round_to_2_decimal(float(stat.traded_value_avg) / 10000000) if stat.traded_value_avg else 0.0,  # Crores
+            "traded_value_multiple": round_to_2_decimal(stat.traded_value_multiple) if stat.traded_value_multiple else 0.0,
+            "delivery_value": round_to_2_decimal(float(stat.delivery_value) / 10000000) if stat.delivery_value else 0.0,  # Crores
+            "delivery_value_avg": round_to_2_decimal(float(stat.delivery_value_avg) / 10000000) if stat.delivery_value_avg else 0.0,  # Crores
+            "delivery_value_multiple": round_to_2_decimal(stat.delivery_value_multiple) if stat.delivery_value_multiple else 0.0,
         })
     
     # Sort by mcap descending
@@ -249,6 +255,7 @@ def compute_vwap_metrics(
             models.IndustryVWAPSnapshot.date == target_date
         ).all()
         
+        # Get industry names from Industry table only
         industry_names = {}
         industries = db.query(models.Industry).filter(
             models.Industry.industry_id.in_([s.industry_id for s in snapshots])
@@ -256,6 +263,7 @@ def compute_vwap_metrics(
         for ind in industries:
             industry_names[ind.industry_id] = ind.name
         
+        # Fallback for any missing industry names
         for snapshot in snapshots:
             if snapshot.industry_id not in industry_names:
                 industry_names[snapshot.industry_id] = snapshot.industry_id.replace("_", " ").title()
@@ -272,8 +280,8 @@ def compute_vwap_metrics(
         results.append({
             "id": entity_id,
             "name": name,
-            "mcap": float(snapshot.total_mcap) / 10000000,  # Convert to crores
-            "pct_mcap_price_above_vwap": snapshot.pct_mcap_price_above_vwap * 100 if snapshot.pct_mcap_price_above_vwap else 0,
+            "mcap": round_to_2_decimal(float(snapshot.total_mcap) / 10000000) or 0.0,  # Convert to crores
+            "pct_mcap_price_above_vwap": round_to_2_decimal(snapshot.pct_mcap_price_above_vwap * 100) if snapshot.pct_mcap_price_above_vwap else 0.0,
         })
     
     # Sort by mcap descending
