@@ -1,6 +1,17 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// API URL configuration:
+// - If VITE_API_URL is set, use it (for local development: http://localhost:8000)
+// - If not set, use empty string (relative URL) for ngrok setup (goes through Vite proxy)
+const envApiUrl = import.meta.env.VITE_API_URL;
+const API_URL = envApiUrl || ''; // Empty string = relative URL = uses Vite proxy for ngrok
+
+console.log('API Client Config:', {
+  VITE_API_URL: envApiUrl,
+  API_URL: API_URL,
+  isLocal: envApiUrl && envApiUrl.includes('localhost'),
+  isNgrok: !envApiUrl || envApiUrl === ''
+});
 
 const client = axios.create({
   baseURL: API_URL,
@@ -8,6 +19,30 @@ const client = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Add response interceptor for better error handling
+client.interceptors.response.use(
+  (response) => {
+    console.log('API Response:', {
+      url: response.config?.url,
+      status: response.status,
+      dataType: typeof response.data,
+      isArray: Array.isArray(response.data),
+      dataLength: Array.isArray(response.data) ? response.data.length : 'N/A',
+    });
+    return response;
+  },
+  (error) => {
+    console.error('API Error:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data,
+    });
+    return Promise.reject(error);
+  }
+);
 
 export interface SectorSummary {
   sector_id: string;

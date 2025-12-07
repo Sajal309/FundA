@@ -19,7 +19,11 @@ function MarketSentiment() {
   const { data, isLoading } = useQuery<MarketSentimentData>(
     'market-sentiment',
     async () => {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/market-sentiment`);
+      // Use relative URL to go through Vite proxy
+      const apiUrl = import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('localhost')
+        ? import.meta.env.VITE_API_URL
+        : '';
+      const response = await fetch(`${apiUrl}/api/v1/market-sentiment`);
       if (!response.ok) throw new Error('Failed to fetch market sentiment');
       return response.json();
     },

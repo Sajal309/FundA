@@ -20,7 +20,11 @@ function BreadthLeadership() {
   const { data, isLoading } = useQuery<BreadthResponse>(
     'breadth',
     async () => {
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/breadth`);
+      // Use relative URL to go through Vite proxy
+      const apiUrl = import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('localhost')
+        ? import.meta.env.VITE_API_URL
+        : '';
+      const response = await fetch(`${apiUrl}/api/v1/breadth`);
       if (!response.ok) throw new Error('Failed to fetch breadth data');
       return response.json();
     },

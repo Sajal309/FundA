@@ -25,23 +25,44 @@ function Dashboard() {
   const [showDriverCard, setShowDriverCard] = useState(false);
   const [driverCardSector, setDriverCardSector] = useState<string | null>(null);
 
-  const { data: sectors, isLoading: sectorsLoading } = useQuery(
+  const { data: sectors, isLoading: sectorsLoading, error: sectorsError } = useQuery(
     'sectors',
-    api.getSectors,
-    { refetchInterval: 300000 } // Refetch every 5 minutes
+    async () => {
+      try {
+        const data = await api.getSectors();
+        console.log('API response:', { type: typeof data, isArray: Array.isArray(data), length: Array.isArray(data) ? data.length : 'N/A', data });
+        // Ensure we always return an array
+        if (!Array.isArray(data)) {
+          console.error('API returned non-array data:', data);
+          return [];
+        }
+        console.log('Returning sectors:', data.length);
+        return data;
+      } catch (error) {
+        console.error('Failed to fetch sectors:', error);
+        throw error;
+      }
+    },
+    { 
+      refetchInterval: 300000, // Refetch every 5 minutes
+      retry: 2,
+      onError: (error) => {
+        console.error('Failed to fetch sectors:', error);
+      }
+    }
   );
 
   const { data: forecasts, isLoading: forecastsLoading } = useQuery(
     ['forecasts', sectors],
     async () => {
-      if (!sectors) return [];
+      if (!sectors || !Array.isArray(sectors)) return [];
       const forecastPromises = sectors.map((sector) =>
         api.getSectorForecast(sector.sector_id).catch(() => null)
       );
       const results = await Promise.all(forecastPromises);
       return results.filter((f): f is ForecastResponse => f !== null);
     },
-    { enabled: !!sectors }
+    { enabled: !!sectors && Array.isArray(sectors) }
   );
 
   const { data: driverCardForecast } = useQuery(
@@ -59,6 +80,52 @@ function Dashboard() {
     return (
       <div className="min-h-screen bg-dark-900 flex items-center justify-center">
         <div className="text-xl text-dark-100">Loading sectors...</div>
+      </div>
+    );
+  }
+
+  if (sectorsError) {
+    return (
+      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-xl text-red-400 mb-4">Error loading sectors</div>
+          <div className="text-sm text-dark-400">
+            {sectorsError instanceof Error ? sectorsError.message : 'Unknown error'}
+          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Debug logging
+  console.log('Dashboard render:', { 
+    sectors, 
+    isArray: Array.isArray(sectors), 
+    length: Array.isArray(sectors) ? sectors.length : 'N/A',
+    isLoading: sectorsLoading,
+    error: sectorsError 
+  });
+
+  if (!sectors || !Array.isArray(sectors) || sectors.length === 0) {
+    return (
+      <div className="min-h-screen bg-dark-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-xl text-dark-100 mb-4">No sectors data available</div>
+          <div className="text-sm text-dark-400">
+            {sectorsLoading && 'Loading...'}
+            {sectorsError && `Error: ${sectorsError instanceof Error ? sectorsError.message : 'Unknown error'}`}
+            {!sectorsLoading && !sectorsError && 'No data returned from API'}
+          </div>
+          <div className="text-xs text-dark-500 mt-2">
+            Debug: sectors={sectors ? (Array.isArray(sectors) ? `${sectors.length} items` : typeof sectors) : 'null/undefined'}
+          </div>
+        </div>
       </div>
     );
   }
@@ -153,7 +220,7 @@ function Dashboard() {
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-            {sectors?.map((sector) => {
+            {Array.isArray(sectors) && sectors.map((sector) => {
               const forecast = forecasts?.find((f) => f.sector_id === sector.sector_id);
               return (
                 <SectorTile

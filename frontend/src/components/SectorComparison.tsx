@@ -30,7 +30,13 @@ function SectorComparison({ sectors }: SectorComparisonProps) {
       if (selectedSectors.length === 0) return null;
       const sectorIds = selectedSectors.join(',');
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/analytics/sectors/compare?sector_ids=${sectorIds}&metric=${metric}`
+        // Use relative URL to go through Vite proxy
+        (() => {
+          const apiUrl = import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('localhost')
+            ? import.meta.env.VITE_API_URL
+            : '';
+          return `${apiUrl}/api/v1/analytics/sectors/compare?sector_ids=${sectorIds}&metric=${metric}`;
+        })()
       );
       if (!response.ok) return null;
       return response.json();
