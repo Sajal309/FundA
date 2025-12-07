@@ -141,6 +141,9 @@ class SectorSummary(BaseModel):
     ret_1m: float
     ret_1w: float
     sparkline: List[float]
+    valuation_pe: Optional[float] = None
+    valuation_state: Optional[str] = None  # "cheap", "fair", "expensive"
+    sentiment_score_7d: Optional[float] = None  # 0-100
 
 
 class ForecastResponse(BaseModel):
@@ -155,6 +158,7 @@ class ForecastResponse(BaseModel):
     top_drivers: List[ForecastDriver]
     quarter_score: Optional[float] = None
     drivers: Optional[Dict[str, Dict[str, Any]]] = None  # QuarterScore contributions
+    derivatives_sentiment: Optional[Dict[str, Any]] = None  # Derivatives sentiment label and metrics
 
 
 class TimeseriesPoint(BaseModel):

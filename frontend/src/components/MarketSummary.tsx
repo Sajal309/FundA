@@ -21,7 +21,7 @@ function MarketSummary() {
     : null;
 
   return (
-    <div className="bg-gradient-to-r from-blue-600 to-blue-800 rounded-lg shadow-lg p-6 text-white">
+    <div className="bg-gradient-to-r from-blue-900/50 to-blue-800/50 rounded-lg shadow-lg p-6 border border-blue-700/30 text-dark-100">
       <h3 className="text-xl font-bold mb-4">Market Summary</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
@@ -29,7 +29,7 @@ function MarketSummary() {
           <div className="text-2xl font-bold">
             {flows ? (
               <span className={flows.total_fii_net >= 0 ? 'text-green-300' : 'text-red-300'}>
-                ₹{(flows.total_fii_net / 1000000).toFixed(1)} Cr
+                ₹{(flows.total_fii_net / 1000000).toFixed(2)} Cr
               </span>
             ) : (
               'N/A'
@@ -41,7 +41,7 @@ function MarketSummary() {
           <div className="text-2xl font-bold">
             {flows ? (
               <span className={flows.total_dii_net >= 0 ? 'text-green-300' : 'text-red-300'}>
-                ₹{(flows.total_dii_net / 1000000).toFixed(1)} Cr
+                ₹{(flows.total_dii_net / 1000000).toFixed(2)} Cr
               </span>
             ) : (
               'N/A'

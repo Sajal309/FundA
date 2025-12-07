@@ -68,26 +68,26 @@ function SectorComparison({ sectors }: SectorComparisonProps) {
     : [];
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Sector Comparison</h3>
+        <h3 className="text-lg font-semibold text-dark-100">Sector Comparison</h3>
         <div className="flex gap-2">
           <button
             onClick={() => setMetric('returns')}
-            className={`px-3 py-1 rounded text-sm ${
+            className={`px-3 py-1 rounded text-sm transition-colors ${
               metric === 'returns'
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700'
+                : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
             }`}
           >
             Returns
           </button>
           <button
             onClick={() => setMetric('sentiment')}
-            className={`px-3 py-1 rounded text-sm ${
+            className={`px-3 py-1 rounded text-sm transition-colors ${
               metric === 'sentiment'
                 ? 'bg-blue-600 text-white'
-                : 'bg-gray-200 text-gray-700'
+                : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
             }`}
           >
             Sentiment
@@ -97,7 +97,7 @@ function SectorComparison({ sectors }: SectorComparisonProps) {
 
       {/* Sector Selection */}
       <div className="mb-4">
-        <div className="text-sm text-gray-600 mb-2">Select sectors to compare (max 5):</div>
+        <div className="text-sm text-dark-400 mb-2">Select sectors to compare (max 5):</div>
         <div className="flex flex-wrap gap-2">
           {sectors.map((sector) => (
             <button
@@ -106,7 +106,7 @@ function SectorComparison({ sectors }: SectorComparisonProps) {
               className={`px-3 py-1 rounded text-sm transition-colors ${
                 selectedSectors.includes(sector.sector_id)
                   ? 'bg-blue-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                  : 'bg-dark-700 text-dark-300 hover:bg-dark-600 border border-dark-600'
               }`}
             >
               {sector.name}
@@ -117,27 +117,33 @@ function SectorComparison({ sectors }: SectorComparisonProps) {
 
       {/* Chart */}
       {isLoading ? (
-        <div className="text-center py-8">Loading comparison...</div>
+        <div className="text-center py-8 text-dark-400">Loading comparison...</div>
       ) : chartData.length > 0 ? (
         <ResponsiveContainer width="100%" height={300}>
           {metric === 'returns' ? (
             <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="sector" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Legend />
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="sector" tick={{ fontSize: 12, fill: '#d1d5db' }} />
+              <YAxis tick={{ fontSize: 12, fill: '#d1d5db' }} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', color: '#f3f4f6' }}
+                labelStyle={{ color: '#f3f4f6' }}
+              />
+              <Legend wrapperStyle={{ color: '#d1d5db' }} />
               <Bar dataKey="1D" fill="#3b82f6" name="1 Day Return %" />
               <Bar dataKey="5D" fill="#10b981" name="5 Day Return %" />
               <Bar dataKey="1M" fill="#f59e0b" name="1 Month Return %" />
             </BarChart>
           ) : (
             <LineChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="sector" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Legend />
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+              <XAxis dataKey="sector" tick={{ fontSize: 12, fill: '#d1d5db' }} />
+              <YAxis tick={{ fontSize: 12, fill: '#d1d5db' }} />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', color: '#f3f4f6' }}
+                labelStyle={{ color: '#f3f4f6' }}
+              />
+              <Legend wrapperStyle={{ color: '#d1d5db' }} />
               <Line
                 type="monotone"
                 dataKey="1D"
@@ -156,7 +162,7 @@ function SectorComparison({ sectors }: SectorComparisonProps) {
           )}
         </ResponsiveContainer>
       ) : (
-        <div className="text-center py-8 text-gray-500">
+        <div className="text-center py-8 text-dark-400">
           Select sectors to compare
         </div>
       )}

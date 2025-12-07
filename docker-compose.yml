@@ -28,9 +28,9 @@ services:
       SECRET_KEY: supersecret
       ALCHEMY_ECHO: "false"
       NEWSAPI_KEY: c7e83904e13941eea773235bea1fa29b
-      KITE_API_KEY: 2pl8jdm3kobxu007
-      KITE_API_SECRET: 2getzlqolcprjdu9k2820cwxbxystvwj
-      KITE_ACCESS_TOKEN: h51QM7rsosH5g5Zn0pzovN1LP4vUTRqT
+      KITE_API_KEY: j9cwrgsejy2vodgv
+      KITE_API_SECRET: yh7g1r63r86srfm5ynalh3uoa1fp3dxy
+      KITE_ACCESS_TOKEN: py99VoAXQOKyrQ3Sh2eMKi4wR9ZIGZuw
     volumes:
       - ./backend:/app
       - ./sample_data:/app/sample_data

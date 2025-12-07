@@ -4,8 +4,10 @@ import numpy as np
 from datetime import date, timedelta
 from typing import Dict, List, Optional, Tuple
 from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from app.db import crud, models
 from app.utils import logger
+from app.utils.formatting import round_to_2_decimal, round_to_int, safe_divide
 
 
 def calculate_sector_correlations(
@@ -135,11 +137,11 @@ def analyze_sector_trends(
     
     return {
         "trend": trend,
-        "trend_strength": abs(recent_returns) * 100,
+        "trend_strength": round_to_2_decimal(abs(recent_returns) * 100) or 0.0,
         "volatility_regime": vol_regime,
-        "current_volatility": float(current_vol) if not pd.isna(current_vol) else None,
-        "avg_volatility": float(avg_vol) if not pd.isna(avg_vol) else None,
-        "price_change_pct": float((df['close'].iloc[-1] - df['close'].iloc[0]) / df['close'].iloc[0] * 100),
+        "current_volatility": round_to_2_decimal(current_vol) if not pd.isna(current_vol) else None,
+        "avg_volatility": round_to_2_decimal(avg_vol) if not pd.isna(avg_vol) else None,
+        "price_change_pct": round_to_2_decimal((df['close'].iloc[-1] - df['close'].iloc[0]) / df['close'].iloc[0] * 100) or 0.0,
     }
 
 
@@ -214,8 +216,51 @@ def get_flows_analysis(
             models.SectorFlowsDaily.date <= to_date
         ).order_by(models.SectorFlowsDaily.date).all()
     
+    # If no sector flows, try to get from FIIDIIDaily
     if not flows:
-        return {}
+        from sqlalchemy import and_
+        fii_dii_records = db.query(models.FIIDIIDaily).filter(
+            and_(
+                models.FIIDIIDaily.date >= from_date,
+                models.FIIDIIDaily.date <= to_date
+            )
+        ).order_by(models.FIIDIIDaily.date).all()
+        
+        if fii_dii_records:
+            # Aggregate by date
+            flows_by_date = {}
+            for record in fii_dii_records:
+                date_key = record.date.isoformat()
+                if date_key not in flows_by_date:
+                    flows_by_date[date_key] = {"fii": 0, "dii": 0}
+                
+                # Compute net from buy/sell
+                fii_net = float(record.fii_buy or 0) - float(record.fii_sell or 0)
+                dii_net = float(record.dii_buy or 0) - float(record.dii_sell or 0)
+                
+                flows_by_date[date_key]["fii"] += fii_net
+                flows_by_date[date_key]["dii"] += dii_net
+            
+            # Calculate statistics
+            fii_values = [v["fii"] for v in flows_by_date.values()]
+            dii_values = [v["dii"] for v in flows_by_date.values()]
+            
+            return {
+                "total_fii_net": sum(fii_values),
+                "total_dii_net": sum(dii_values),
+                "avg_daily_fii": sum(fii_values) / len(fii_values) if fii_values else 0,
+                "avg_daily_dii": sum(dii_values) / len(dii_values) if dii_values else 0,
+                "flows_by_date": flows_by_date,
+            }
+        
+        # Return empty structure with zeros
+        return {
+            "total_fii_net": 0,
+            "total_dii_net": 0,
+            "avg_daily_fii": 0,
+            "avg_daily_dii": 0,
+            "flows_by_date": {},
+        }
     
     # Aggregate flows by date
     flows_by_date = {}
@@ -224,9 +269,9 @@ def get_flows_analysis(
         if date_key not in flows_by_date:
             flows_by_date[date_key] = {"fii": 0, "dii": 0}
         if flow.fii_net_inr:
-            flows_by_date[date_key]["fii"] += flow.fii_net_inr
+            flows_by_date[date_key]["fii"] += float(flow.fii_net_inr)
         if flow.dii_net_inr:
-            flows_by_date[date_key]["dii"] += flow.dii_net_inr
+            flows_by_date[date_key]["dii"] += float(flow.dii_net_inr)
     
     # Calculate statistics
     fii_values = [v["fii"] for v in flows_by_date.values()]
@@ -386,52 +431,55 @@ def calculate_performance_metrics(
     
     returns_series = df['returns']
     
-    # Annualized return
+    # Annualized return (improved precision)
     total_return = (df['close'].iloc[-1] / df['close'].iloc[0] - 1)
-    annualized_return = (1 + total_return) ** (252 / len(df)) - 1
+    trading_days = len(df)
+    annualized_return = (1 + total_return) ** (252.0 / trading_days) - 1 if trading_days > 0 else 0.0
     
-    # Volatility (annualized)
-    volatility = returns_series.std() * np.sqrt(252)
+    # Volatility (annualized) - use sample standard deviation for better accuracy
+    volatility = returns_series.std(ddof=1) * np.sqrt(252.0) if len(returns_series) > 1 else 0.0
     
     # Sharpe ratio (assuming risk-free rate = 0.05 = 5%)
     risk_free_rate = 0.05
-    sharpe_ratio = (annualized_return - risk_free_rate) / volatility if volatility > 0 else 0
+    sharpe_ratio = safe_divide(annualized_return - risk_free_rate, volatility, default=0.0)
     
-    # Max drawdown
+    # Max drawdown (improved calculation)
     cumulative = (1 + returns_series).cumprod()
     running_max = cumulative.expanding().max()
-    drawdown = (cumulative - running_max) / running_max
-    max_drawdown = drawdown.min()
+    # Calculate drawdown as a Series
+    drawdown_series = (cumulative - running_max) / running_max
+    max_drawdown = round_to_2_decimal(drawdown_series.min()) or 0.0 if len(drawdown_series) > 0 else 0.0
     
     # Win rate
     positive_days = (returns_series > 0).sum()
-    win_rate = positive_days / len(returns_series) if len(returns_series) > 0 else 0
+    win_rate = safe_divide(positive_days, len(returns_series), default=0.0)
     
     # Average win vs average loss
     wins = returns_series[returns_series > 0]
     losses = returns_series[returns_series < 0]
-    avg_win = wins.mean() if len(wins) > 0 else 0
-    avg_loss = losses.mean() if len(losses) > 0 else 0
-    profit_factor = abs(avg_win / avg_loss) if avg_loss != 0 else 0
+    avg_win = wins.mean() if len(wins) > 0 else 0.0
+    avg_loss = losses.mean() if len(losses) > 0 else 0.0
+    profit_factor = abs(safe_divide(avg_win, avg_loss, default=0.0))
     
-    # RSI calculation
+    # RSI calculation (improved precision)
     delta = df['close'].diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-    rs = gain / loss
-    rsi = 100 - (100 / (1 + rs))
+    gain = (delta.where(delta > 0, 0)).rolling(window=14, min_periods=1).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=14, min_periods=1).mean()
+    # Avoid division by zero - replace zeros in loss with NaN, then fill
+    rs = gain / loss.replace(0, np.nan)
+    rsi = 100.0 - (100.0 / (1.0 + rs))
     current_rsi = rsi.iloc[-1] if not pd.isna(rsi.iloc[-1]) else None
     
     return {
-        "annualized_return": float(annualized_return),
-        "volatility": float(volatility),
-        "sharpe_ratio": float(sharpe_ratio),
-        "max_drawdown": float(max_drawdown),
-        "win_rate": float(win_rate),
-        "profit_factor": float(profit_factor),
-        "current_rsi": float(current_rsi) if current_rsi is not None else None,
-        "total_return": float(total_return),
-        "avg_daily_return": float(returns_series.mean()),
+        "annualized_return": round_to_2_decimal(annualized_return) or 0.0,
+        "volatility": round_to_2_decimal(volatility) or 0.0,
+        "sharpe_ratio": round_to_2_decimal(sharpe_ratio) or 0.0,
+        "max_drawdown": round_to_2_decimal(max_drawdown) or 0.0,
+        "win_rate": round_to_2_decimal(win_rate) or 0.0,
+        "profit_factor": round_to_2_decimal(profit_factor) or 0.0,
+        "current_rsi": round_to_2_decimal(current_rsi),
+        "total_return": round_to_2_decimal(total_return) or 0.0,
+        "avg_daily_return": round_to_2_decimal(returns_series.mean()) or 0.0,
     }
 
 
@@ -564,11 +612,11 @@ def calculate_beta_and_correlation_to_market(
     alpha = sector_mean - (beta * market_mean)
     
     return {
-        "beta": float(beta),
-        "correlation_to_market": float(correlation),
-        "alpha": float(alpha),
-        "market_return": float(market_mean),
-        "sector_return": float(sector_mean),
+        "beta": round_to_2_decimal(beta) or 0.0,
+        "correlation_to_market": round_to_2_decimal(correlation) or 0.0,
+        "alpha": round_to_2_decimal(alpha) or 0.0,
+        "market_return": round_to_2_decimal(market_mean) or 0.0,
+        "sector_return": round_to_2_decimal(sector_mean) or 0.0,
     }
 
 
@@ -618,14 +666,14 @@ def get_macro_indicators_summary(
             us10y_change = float(latest.us_10y_close) - float(prev.us_10y_close)
     
     return {
-        "usd_inr": float(latest.usd_inr_close) if latest and latest.usd_inr_close else None,
-        "usd_inr_change_pct": float(usdinr_change) if usdinr_change is not None else None,
-        "brent_crude": float(latest.brent_close) if latest and latest.brent_close else None,
-        "brent_change_pct": float(brent_change) if brent_change is not None else None,
-        "gold_price": float(latest.gold_close) if latest and latest.gold_close else None,
-        "gold_change_pct": float(gold_change) if gold_change is not None else None,
-        "us_10y_yield": float(latest.us_10y_close) if latest and latest.us_10y_close else None,
-        "us_10y_change": float(us10y_change) if us10y_change is not None else None,
+        "usd_inr": round_to_2_decimal(latest.usd_inr_close) if latest and latest.usd_inr_close else None,
+        "usd_inr_change_pct": round_to_2_decimal(usdinr_change) if usdinr_change is not None else None,
+        "brent_crude": round_to_2_decimal(latest.brent_close) if latest and latest.brent_close else None,
+        "brent_change_pct": round_to_2_decimal(brent_change) if brent_change is not None else None,
+        "gold_price": round_to_2_decimal(latest.gold_close) if latest and latest.gold_close else None,
+        "gold_change_pct": round_to_2_decimal(gold_change) if gold_change is not None else None,
+        "us_10y_yield": round_to_2_decimal(latest.us_10y_close) if latest and latest.us_10y_close else None,
+        "us_10y_change": round_to_2_decimal(us10y_change) if us10y_change is not None else None,
         "date": latest.date.isoformat() if latest else None,
     }
 

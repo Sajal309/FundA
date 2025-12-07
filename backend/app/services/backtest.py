@@ -1,7 +1,7 @@
 """Backtesting module for evaluating forecast accuracy."""
 import pandas as pd
 from datetime import date, timedelta
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 from sqlalchemy.orm import Session
 from app.db import crud, models
 from app.utils import logger
@@ -130,6 +130,7 @@ def evaluate_forecast_accuracy(
             "prob_up": forecast.prob_up,
             "prob_neutral": forecast.prob_neutral,
             "prob_down": forecast.prob_down,
+            "quarter_score": float(forecast.quarter_score) if forecast.quarter_score else None,
         })
     
     return results
@@ -247,5 +248,59 @@ def run_backtest(
         "status": "success",
         "results": results,
         "metrics": metrics
+    }
+
+
+def analyze_quarterscore_performance(
+    results: List[Dict]
+) -> Dict[str, Any]:
+    """
+    Analyze QuarterScore performance by score buckets.
+    
+    Args:
+        results: List of evaluation results with quarter_score
+        
+    Returns:
+        Dictionary with performance by QuarterScore buckets
+    """
+    # Filter results with QuarterScore
+    scored_results = [r for r in results if r.get("quarter_score") is not None]
+    
+    if not scored_results:
+        return {
+            "total_scored": 0,
+            "buckets": []
+        }
+    
+    # Define buckets
+    buckets = [
+        {"name": "Strong Positive", "min": 1.5, "max": float('inf')},
+        {"name": "Moderate Positive", "min": 0.5, "max": 1.5},
+        {"name": "Neutral", "min": -0.5, "max": 0.5},
+        {"name": "Moderate Negative", "min": -1.5, "max": -0.5},
+        {"name": "Strong Negative", "min": float('-inf'), "max": -1.5},
+    ]
+    
+    bucket_analysis = []
+    for bucket in buckets:
+        bucket_results = [
+            r for r in scored_results
+            if bucket["min"] <= r["quarter_score"] < bucket["max"]
+        ]
+        
+        if bucket_results:
+            avg_return = sum(r["realized_return"] for r in bucket_results) / len(bucket_results)
+            accuracy = sum(1 for r in bucket_results if r["is_correct"]) / len(bucket_results)
+            bucket_analysis.append({
+                "bucket": bucket["name"],
+                "count": len(bucket_results),
+                "avg_realized_return": round(avg_return, 2),
+                "accuracy": round(accuracy, 3),
+                "avg_quarterscore": round(sum(r["quarter_score"] for r in bucket_results) / len(bucket_results), 2),
+            })
+    
+    return {
+        "total_scored": len(scored_results),
+        "buckets": bucket_analysis
     }
 

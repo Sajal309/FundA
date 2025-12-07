@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, and_
 from app.db import crud, models
 from app.utils import logger
+from app.utils.formatting import round_to_2_decimal
 
 
 def load_quarter_weights() -> Dict[str, Any]:
@@ -96,15 +97,15 @@ def compute_momentum_features(
         
         # 1-month relative return
         if len(sector_df) >= 21 and len(nifty_df) >= 21:
-            sector_1m = float((sector_df['close'].iloc[-1] / sector_df['close'].iloc[-21] - 1) * 100)
-            nifty_1m = float((nifty_df['close'].iloc[-1] / nifty_df['close'].iloc[-21] - 1) * 100)
-            rel_1m_vs_nifty = sector_1m - nifty_1m
+            sector_1m = round_to_2_decimal((sector_df['close'].iloc[-1] / sector_df['close'].iloc[-21] - 1) * 100) or 0.0
+            nifty_1m = round_to_2_decimal((nifty_df['close'].iloc[-1] / nifty_df['close'].iloc[-21] - 1) * 100) or 0.0
+            rel_1m_vs_nifty = round_to_2_decimal(sector_1m - nifty_1m) or 0.0
         
         # 3-month relative return
         if len(sector_df) >= 63 and len(nifty_df) >= 63:
-            sector_3m = float((sector_df['close'].iloc[-1] / sector_df['close'].iloc[-63] - 1) * 100)
-            nifty_3m = float((nifty_df['close'].iloc[-1] / nifty_df['close'].iloc[-63] - 1) * 100)
-            rel_3m_vs_nifty = sector_3m - nifty_3m
+            sector_3m = round_to_2_decimal((sector_df['close'].iloc[-1] / sector_df['close'].iloc[-63] - 1) * 100) or 0.0
+            nifty_3m = round_to_2_decimal((nifty_df['close'].iloc[-1] / nifty_df['close'].iloc[-63] - 1) * 100) or 0.0
+            rel_3m_vs_nifty = round_to_2_decimal(sector_3m - nifty_3m) or 0.0
     
     return {
         "ret_3m": ret_3m,
@@ -404,7 +405,7 @@ def normalize_feature(value: Optional[float], min_val: float, max_val: float) ->
     if max_val == min_val:
         return 0.0
     normalized = 2 * (clamped - min_val) / (max_val - min_val) - 1
-    return float(normalized)
+    return round_to_2_decimal(normalized) or 0.0
 
 
 def compute_quarter_score(
@@ -455,34 +456,38 @@ def compute_quarter_score(
     contributions = {}
     
     # Momentum component (combine 1M and 3M)
-    momentum_1m_norm = normalize_feature(momentum.get('rel_1m_vs_nifty'), -10.0, 10.0)
-    momentum_3m_norm = normalize_feature(momentum.get('rel_3m_vs_nifty'), -20.0, 20.0)
+    rel_1m = momentum.get('rel_1m_vs_nifty') or 0.0
+    rel_3m = momentum.get('rel_3m_vs_nifty') or 0.0
+    momentum_1m_norm = normalize_feature(rel_1m, -10.0, 10.0)
+    momentum_3m_norm = normalize_feature(rel_3m, -20.0, 20.0)
     momentum_score = (momentum_1m_norm * weights['momentum_1m'] + 
                      momentum_3m_norm * weights['momentum_3m']) / (weights['momentum_1m'] + weights['momentum_3m'])
     contributions['momentum'] = {
         'score': momentum_score,
-        'detail': f"1M: {momentum.get('rel_1m_vs_nifty', 0):.2f}%, 3M: {momentum.get('rel_3m_vs_nifty', 0):.2f}% vs Nifty"
+        'detail': f"1M: {rel_1m:.2f}%, 3M: {rel_3m:.2f}% vs Nifty"
     }
     
     # Breadth component
-    breadth_norm = normalize_feature(breadth.get('breadth_above_50dma'), 0.0, 1.0)
+    breadth_above_50dma = breadth.get('breadth_above_50dma') or 0.0
+    breadth_norm = normalize_feature(breadth_above_50dma, 0.0, 1.0)
     breadth_score = breadth_norm
     contributions['breadth'] = {
         'score': breadth_score,
-        'detail': f"{breadth.get('breadth_above_50dma', 0)*100:.0f}% stocks above 50DMA"
+        'detail': f"{breadth_above_50dma*100:.0f}% stocks above 50DMA"
     }
     
     # Flows component
-    flows_norm = normalize_feature(flows.get('fii_net_inr_percentile'), 0.0, 1.0)
+    fii_percentile = flows.get('fii_net_inr_percentile') or 0.0
+    flows_norm = normalize_feature(fii_percentile, 0.0, 1.0)
     flows_score = flows_norm * 2 - 1  # Convert 0-1 to -1 to +1
     contributions['flows'] = {
         'score': flows_score,
-        'detail': f"FII 20d flows at {flows.get('fii_net_inr_percentile', 0)*100:.0f}th percentile"
+        'detail': f"FII 20d flows at {fii_percentile*100:.0f}th percentile"
     }
     
     # Earnings component
-    upgrades_pct = earnings.get('earnings_upgrades_pct_60d', 0) or 0
-    downgrades_pct = earnings.get('earnings_downgrades_pct_60d', 0) or 0
+    upgrades_pct = earnings.get('earnings_upgrades_pct_60d') or 0.0
+    downgrades_pct = earnings.get('earnings_downgrades_pct_60d') or 0.0
     earnings_score = normalize_feature(upgrades_pct - downgrades_pct, -1.0, 1.0)
     contributions['earnings'] = {
         'score': earnings_score,
@@ -522,5 +527,5 @@ def compute_quarter_score(
         macro_overlay * weights['macro_overlay']
     )
     
-    return float(quarter_score), contributions
+    return round_to_2_decimal(quarter_score) or 0.0, contributions
 

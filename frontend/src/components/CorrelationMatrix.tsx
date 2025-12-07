@@ -23,18 +23,18 @@ function CorrelationMatrix({ lookbackDays = 30 }: CorrelationMatrixProps) {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Sector Correlations</h3>
-        <div className="text-center py-8">Loading correlations...</div>
+      <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+        <h3 className="text-lg font-semibold mb-4 text-dark-100">Sector Correlations</h3>
+        <div className="text-center py-8 text-dark-400">Loading correlations...</div>
       </div>
     );
   }
 
   if (!data || !data.correlations) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Sector Correlations</h3>
-        <div className="text-center py-8 text-gray-500">No correlation data available</div>
+      <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+        <h3 className="text-lg font-semibold mb-4 text-dark-100">Sector Correlations</h3>
+        <div className="text-center py-8 text-dark-400">No correlation data available</div>
       </div>
     );
   }
@@ -91,17 +91,17 @@ function CorrelationMatrix({ lookbackDays = 30 }: CorrelationMatrixProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold mb-4">Sector Correlation Matrix ({lookbackDays} days)</h3>
+    <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+      <h3 className="text-lg font-semibold mb-4 text-dark-100">Sector Correlation Matrix ({lookbackDays} days)</h3>
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
-            <tr>
-              <th className="px-2 py-2 text-left font-medium text-gray-700"></th>
+            <tr className="bg-dark-700">
+              <th className="px-2 py-2 text-left font-medium text-dark-300"></th>
               {sectorList.map((sector) => (
                 <th
                   key={sector}
-                  className="px-2 py-2 text-left font-medium text-gray-700 whitespace-nowrap"
+                  className="px-2 py-2 text-left font-medium text-dark-300 whitespace-nowrap"
                   style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
                 >
                   {sector.replace('NIFTY_', '')}
@@ -111,8 +111,8 @@ function CorrelationMatrix({ lookbackDays = 30 }: CorrelationMatrixProps) {
           </thead>
           <tbody>
             {sectorList.map((sector1) => (
-              <tr key={sector1}>
-                <td className="px-2 py-2 font-medium text-gray-700 whitespace-nowrap">
+              <tr key={sector1} className="border-b border-dark-700">
+                <td className="px-2 py-2 font-medium text-dark-300 whitespace-nowrap bg-dark-700">
                   {sector1.replace('NIFTY_', '')}
                 </td>
                 {sectorList.map((sector2) => {
@@ -147,7 +147,7 @@ function CorrelationMatrix({ lookbackDays = 30 }: CorrelationMatrixProps) {
           </tbody>
         </table>
       </div>
-      <div className="mt-4 flex items-center justify-center gap-4 text-xs">
+      <div className="mt-4 flex items-center justify-center gap-4 text-xs text-dark-300">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 rounded" style={{ backgroundColor: '#10b981' }}></div>
           <span>High (&gt;0.8)</span>

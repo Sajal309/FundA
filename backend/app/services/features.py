@@ -6,6 +6,7 @@ from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
 from app.db import crud, schemas, models
 from app.utils import logger
+from app.utils.formatting import round_to_2_decimal
 from app.services import features_quarter
 
 
@@ -18,19 +19,21 @@ def calculate_rsi(prices: pd.Series, period: int = 14) -> float:
         period: RSI period (default 14)
         
     Returns:
-        RSI value (0-100)
+        RSI value (0-100, rounded to 2 decimals)
     """
     if len(prices) < period + 1:
         return None
     
     delta = prices.diff()
-    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
-    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period, min_periods=1).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period, min_periods=1).mean()
     
-    rs = gain / loss
-    rsi = 100 - (100 / (1 + rs))
+    # Avoid division by zero
+    rs = gain / loss.replace(0, np.nan)
+    rsi = 100.0 - (100.0 / (1.0 + rs))
     
-    return float(rsi.iloc[-1]) if not pd.isna(rsi.iloc[-1]) else None
+    rsi_value = rsi.iloc[-1] if not pd.isna(rsi.iloc[-1]) else None
+    return round_to_2_decimal(rsi_value) if rsi_value is not None else None
 
 
 def calculate_moving_average(prices: pd.Series, period: int) -> float:
@@ -42,12 +45,13 @@ def calculate_moving_average(prices: pd.Series, period: int) -> float:
         period: MA period
         
     Returns:
-        Moving average value
+        Moving average value (rounded to 2 decimals)
     """
     if len(prices) < period:
         return None
-    ma = prices.rolling(window=period).mean()
-    return float(ma.iloc[-1]) if not pd.isna(ma.iloc[-1]) else None
+    ma = prices.rolling(window=period, min_periods=period).mean()
+    ma_value = ma.iloc[-1] if not pd.isna(ma.iloc[-1]) else None
+    return round_to_2_decimal(ma_value) if ma_value is not None else None
 
 
 def calculate_returns(prices: pd.Series, periods: int) -> float:
@@ -59,12 +63,18 @@ def calculate_returns(prices: pd.Series, periods: int) -> float:
         periods: Number of periods to look back
         
     Returns:
-        Percentage return
+        Percentage return (rounded to 2 decimals)
     """
     if len(prices) < periods + 1:
         return None
     
-    return float((prices.iloc[-1] / prices.iloc[-(periods + 1)] - 1) * 100)
+    start_price = float(prices.iloc[-(periods + 1)])
+    end_price = float(prices.iloc[-1])
+    
+    if start_price == 0:
+        return None
+    
+    return round_to_2_decimal(((end_price / start_price - 1) * 100)) or 0.0
 
 
 def calculate_annualized_volatility(prices: pd.Series, window: int = 20) -> Optional[float]:
@@ -78,18 +88,19 @@ def calculate_annualized_volatility(prices: pd.Series, window: int = 20) -> Opti
         window: Lookback window in trading days
 
     Returns:
-        Annualized volatility in percent, or None if insufficient data
+        Annualized volatility in percent (rounded to 2 decimals), or None if insufficient data
     """
     if len(prices) < window + 1:
         return None
 
     returns = prices.pct_change().dropna()
     window_returns = returns.iloc[-window:]
-    if window_returns.empty:
+    if window_returns.empty or len(window_returns) < 2:
         return None
 
-    vol = window_returns.std() * np.sqrt(252) * 100.0
-    return float(vol) if not np.isnan(vol) else None
+    # Use sample standard deviation (ddof=1) for better accuracy
+    vol = window_returns.std(ddof=1) * np.sqrt(252.0) * 100.0
+    return round_to_2_decimal(vol) if not np.isnan(vol) else None
 
 
 def compute_features_for_sector(
@@ -162,8 +173,26 @@ def compute_features_for_sector(
     
     # Get options data for this sector/date
     # Map sector_id to option underlying (e.g., NIFTY_BANK -> BANKNIFTY, NIFTY_IT -> NIFTY)
+    # Most indices map to NIFTY, banking indices to BANKNIFTY
     sector_to_underlying = {
+        # Broad Market - use NIFTY
+        'NIFTY_50': 'NIFTY',
+        'NIFTY_NEXT_50': 'NIFTY',
+        'NIFTY_100': 'NIFTY',
+        'NIFTY_200': 'NIFTY',
+        'NIFTY_500': 'NIFTY',
+        'NIFTY_MIDCAP_50': 'NIFTY',
+        'NIFTY_MIDCAP_100': 'NIFTY',
+        'NIFTY_MIDCAP_150': 'NIFTY',
+        'NIFTY_SMALLCAP_50': 'NIFTY',
+        'NIFTY_SMALLCAP_100': 'NIFTY',
+        'NIFTY_SMALLCAP_250': 'NIFTY',
+        # Banking indices - use BANKNIFTY
         'NIFTY_BANK': 'BANKNIFTY',
+        'NIFTY_PSU_BANK': 'BANKNIFTY',
+        'NIFTY_PRIVATE_BANK': 'BANKNIFTY',
+        'NIFTY_FIN_SERVICE': 'BANKNIFTY',
+        # Other sectoral indices - use NIFTY
         'NIFTY_IT': 'NIFTY',
         'NIFTY_FMCG': 'NIFTY',
         'NIFTY_PHARMA': 'NIFTY',
@@ -171,8 +200,20 @@ def compute_features_for_sector(
         'NIFTY_ENERGY': 'NIFTY',
         'NIFTY_METAL': 'NIFTY',
         'NIFTY_REALTY': 'NIFTY',
-        'NIFTY_PSU_BANK': 'BANKNIFTY',
-        'NIFTY_PRIVATE_BANK': 'BANKNIFTY',
+        'NIFTY_HEALTHCARE': 'NIFTY',
+        'NIFTY_CONSUMER_DURABLES': 'NIFTY',
+        'NIFTY_INFRA': 'NIFTY',
+        'NIFTY_OIL_GAS': 'NIFTY',
+        'NIFTY_PSE': 'NIFTY',
+        'NIFTY_SERVICES': 'NIFTY',
+        'NIFTY_COMMODITIES': 'NIFTY',
+        # Thematic indices - use NIFTY
+        'NIFTY_GROWTH_SECTORS_15': 'NIFTY',
+        'NIFTY_DIVIDEND_OPPORTUNITIES_50': 'NIFTY',
+        'NIFTY_QUALITY_30': 'NIFTY',
+        'NIFTY_LOW_VOLATILITY_50': 'NIFTY',
+        'NIFTY_ALPHA_50': 'NIFTY',
+        'NIFTY_HIGH_BETA_50': 'NIFTY',
     }
     underlying = sector_to_underlying.get(sector_id, 'NIFTY')
     options_data = crud.get_options_daily(db, underlying, feature_date)

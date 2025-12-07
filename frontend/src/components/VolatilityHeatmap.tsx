@@ -61,18 +61,18 @@ function VolatilityHeatmap({ lookbackDays = 30 }: VolatilityHeatmapProps) {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Volatility Heatmap ({lookbackDays} days)</h3>
-        <div className="text-gray-500">Loading...</div>
+      <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+        <h3 className="text-lg font-semibold mb-4 text-dark-100">Volatility Heatmap ({lookbackDays} days)</h3>
+        <div className="text-dark-400">Loading...</div>
       </div>
     );
   }
 
   if (volatilityData.length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Volatility Heatmap</h3>
-        <div className="text-gray-500">No data available</div>
+      <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+        <h3 className="text-lg font-semibold mb-4 text-dark-100">Volatility Heatmap</h3>
+        <div className="text-dark-400">No data available</div>
       </div>
     );
   }
@@ -83,7 +83,7 @@ function VolatilityHeatmap({ lookbackDays = 30 }: VolatilityHeatmapProps) {
   const range = maxVol - minVol;
 
   const getColor = (volatility: number) => {
-    if (range === 0) return 'bg-gray-300';
+    if (range === 0) return 'bg-dark-600';
     const normalized = (volatility - minVol) / range;
     if (normalized > 0.75) return 'bg-red-500';
     if (normalized > 0.5) return 'bg-orange-400';
@@ -92,15 +92,15 @@ function VolatilityHeatmap({ lookbackDays = 30 }: VolatilityHeatmapProps) {
   };
 
   const getTextColor = (volatility: number) => {
-    if (range === 0) return 'text-gray-800';
+    if (range === 0) return 'text-dark-200';
     const normalized = (volatility - minVol) / range;
     if (normalized > 0.5) return 'text-white';
-    return 'text-gray-800';
+    return 'text-dark-900';
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold mb-4">Volatility Heatmap ({lookbackDays} days)</h3>
+    <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+      <h3 className="text-lg font-semibold mb-4 text-dark-100">Volatility Heatmap ({lookbackDays} days)</h3>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {volatilityData.map((item) => (
           <div
@@ -109,13 +109,13 @@ function VolatilityHeatmap({ lookbackDays = 30 }: VolatilityHeatmapProps) {
           >
             <div className="font-semibold text-sm mb-1">{item.name}</div>
             <div className="text-lg font-bold">
-              {(item.volatility * 100).toFixed(1)}%
+              {(item.volatility * 100).toFixed(2)}%
             </div>
             <div className="text-xs opacity-90 mt-1">Annualized</div>
           </div>
         ))}
       </div>
-      <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
+      <div className="mt-4 flex items-center justify-between text-xs text-dark-400">
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-green-400 rounded"></div>
           <span>Low</span>

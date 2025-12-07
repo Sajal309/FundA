@@ -14,27 +14,27 @@ function MacroIndicators() {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Macro Indicators</h3>
-        <div className="text-gray-500">Loading...</div>
+      <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+        <h3 className="text-lg font-semibold mb-4 text-dark-100">Macro Indicators</h3>
+        <div className="text-dark-400">Loading...</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Macro Indicators</h3>
-        <div className="text-red-500">Error loading data: {String(error)}</div>
+      <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+        <h3 className="text-lg font-semibold mb-4 text-dark-100">Macro Indicators</h3>
+        <div className="text-red-400">Error loading data: {String(error)}</div>
       </div>
     );
   }
 
   if (!macro || Object.keys(macro).length === 0) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Macro Indicators</h3>
-        <div className="text-gray-500">No data available</div>
+      <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+        <h3 className="text-lg font-semibold mb-4 text-dark-100">Macro Indicators</h3>
+        <div className="text-dark-400">No data available</div>
       </div>
     );
   }
@@ -45,18 +45,18 @@ function MacroIndicators() {
   };
 
   const getChangeColor = (value: number | null) => {
-    if (value === null) return 'text-gray-500';
-    return value >= 0 ? 'text-green-600' : 'text-red-600';
+    if (value === null) return 'text-dark-500';
+    return value >= 0 ? 'text-green-400' : 'text-red-400';
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold mb-4">Macro Indicators</h3>
+    <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+      <h3 className="text-lg font-semibold mb-4 text-dark-100">Macro Indicators</h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* USD/INR */}
-        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="text-sm text-gray-600 mb-1">USD/INR</div>
-          <div className="text-xl font-bold text-gray-900">
+        <div className="p-4 bg-blue-900/10 rounded-lg border border-blue-600/30">
+          <div className="text-sm text-dark-400 mb-1">USD/INR</div>
+          <div className="text-xl font-bold text-dark-100">
             {macro.usd_inr ? `₹${macro.usd_inr.toFixed(2)}` : 'N/A'}
           </div>
           <div className={`text-sm font-medium ${getChangeColor(macro.usd_inr_change_pct)}`}>
@@ -65,9 +65,9 @@ function MacroIndicators() {
         </div>
 
         {/* Brent Crude */}
-        <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-          <div className="text-sm text-gray-600 mb-1">Brent Crude</div>
-          <div className="text-xl font-bold text-gray-900">
+        <div className="p-4 bg-orange-900/10 rounded-lg border border-orange-600/30">
+          <div className="text-sm text-dark-400 mb-1">Brent Crude</div>
+          <div className="text-xl font-bold text-dark-100">
             {macro.brent_crude ? `$${macro.brent_crude.toFixed(2)}` : 'N/A'}
           </div>
           <div className={`text-sm font-medium ${getChangeColor(macro.brent_change_pct)}`}>
@@ -76,9 +76,9 @@ function MacroIndicators() {
         </div>
 
         {/* Gold */}
-        <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-          <div className="text-sm text-gray-600 mb-1">Gold</div>
-          <div className="text-xl font-bold text-gray-900">
+        <div className="p-4 bg-yellow-900/10 rounded-lg border border-yellow-600/30">
+          <div className="text-sm text-dark-400 mb-1">Gold</div>
+          <div className="text-xl font-bold text-dark-100">
             {macro.gold_price ? `$${macro.gold_price.toFixed(2)}` : 'N/A'}
           </div>
           <div className={`text-sm font-medium ${getChangeColor(macro.gold_change_pct)}`}>
@@ -87,9 +87,9 @@ function MacroIndicators() {
         </div>
 
         {/* US 10Y Yield */}
-        <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-          <div className="text-sm text-gray-600 mb-1">US 10Y Yield</div>
-          <div className="text-xl font-bold text-gray-900">
+        <div className="p-4 bg-purple-900/10 rounded-lg border border-purple-600/30">
+          <div className="text-sm text-dark-400 mb-1">US 10Y Yield</div>
+          <div className="text-xl font-bold text-dark-100">
             {macro.us_10y_yield ? `${macro.us_10y_yield.toFixed(2)}%` : 'N/A'}
           </div>
           <div className={`text-sm font-medium ${getChangeColor(macro.us_10y_change)}`}>
@@ -98,7 +98,7 @@ function MacroIndicators() {
         </div>
       </div>
       {macro.date && (
-        <div className="mt-4 text-xs text-gray-500 text-center">
+        <div className="mt-4 text-xs text-dark-500 text-center">
           Last updated: {new Date(macro.date).toLocaleDateString()}
         </div>
       )}

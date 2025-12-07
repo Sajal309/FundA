@@ -25,21 +25,21 @@ function AnalyticsWidget({ sectorId }: AnalyticsWidgetProps) {
   );
 
   return (
-    <div className="bg-white rounded-lg shadow p-4">
-      <h4 className="text-sm font-semibold mb-3 text-gray-700">
+    <div className="bg-dark-800 rounded-lg shadow-lg p-4 border border-dark-700">
+      <h4 className="text-sm font-semibold mb-3 text-dark-100">
         {sectorId.replace('NIFTY_', '')} Analytics
       </h4>
       <div className="space-y-3">
         {trends && (
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Trend:</span>
+            <span className="text-dark-400">Trend:</span>
             <span
               className={`font-medium ${
                 trends.trend === 'uptrend'
-                  ? 'text-green-600'
+                  ? 'text-green-400'
                   : trends.trend === 'downtrend'
-                  ? 'text-red-600'
-                  : 'text-yellow-600'
+                  ? 'text-red-400'
+                  : 'text-yellow-400'
               }`}
             >
               {trends.trend}
@@ -48,24 +48,24 @@ function AnalyticsWidget({ sectorId }: AnalyticsWidgetProps) {
         )}
         {flows && (
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">FII (7d):</span>
+            <span className="text-dark-400">FII (7d):</span>
             <span
               className={`font-medium ${
-                flows.total_fii_net >= 0 ? 'text-green-600' : 'text-red-600'
+                flows.total_fii_net >= 0 ? 'text-green-400' : 'text-red-400'
               }`}
             >
-              ₹{(flows.total_fii_net / 1000000).toFixed(1)} Cr
+              ₹{(flows.total_fii_net / 1000000).toFixed(2)} Cr
             </span>
           </div>
         )}
         {sentiment && (
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Sentiment:</span>
+            <span className="text-dark-400">Sentiment:</span>
             <span
               className={`font-medium ${
                 (sentiment.current_sentiment_7d || 0) >= 0
-                  ? 'text-green-600'
-                  : 'text-red-600'
+                  ? 'text-green-400'
+                  : 'text-red-400'
               }`}
             >
               {sentiment.current_sentiment_7d !== null

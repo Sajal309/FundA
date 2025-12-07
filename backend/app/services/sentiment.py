@@ -117,6 +117,19 @@ def extract_sector_tags(text: str, sector_keywords: dict) -> list:
 
 # Sector keyword mapping for news tagging
 SECTOR_KEYWORDS = {
+    # Broad Market Indices - general market keywords
+    'NIFTY_50': ['nifty 50', 'nifty', 'sensex', 'market', 'indian market', 'stock market', 'equity'],
+    'NIFTY_NEXT_50': ['nifty next 50', 'next 50', 'midcap', 'mid cap'],
+    'NIFTY_100': ['nifty 100', 'largecap', 'large cap', 'blue chip'],
+    'NIFTY_200': ['nifty 200', 'largecap', 'midcap'],
+    'NIFTY_500': ['nifty 500', 'broad market', 'entire market'],
+    'NIFTY_MIDCAP_50': ['midcap 50', 'mid cap 50'],
+    'NIFTY_MIDCAP_100': ['midcap 100', 'mid cap 100'],
+    'NIFTY_MIDCAP_150': ['midcap 150', 'mid cap 150'],
+    'NIFTY_SMALLCAP_50': ['smallcap 50', 'small cap 50'],
+    'NIFTY_SMALLCAP_100': ['smallcap 100', 'small cap 100'],
+    'NIFTY_SMALLCAP_250': ['smallcap 250', 'small cap 250', 'smallcap', 'small cap'],
+    # Sectoral Indices
     'NIFTY_BANK': ['bank', 'banking', 'lender', 'credit', 'loan', 'nbfc', 'hdfc', 'icici', 'sbi', 'axis'],
     'NIFTY_IT': ['it', 'software', 'tech', 'technology', 'infosys', 'tcs', 'wipro', 'hcl'],
     'NIFTY_FMCG': ['fmcg', 'consumer', 'hul', 'nestle', 'britannia', 'tata consumer'],
@@ -127,5 +140,20 @@ SECTOR_KEYWORDS = {
     'NIFTY_REALTY': ['realty', 'real estate', 'property', 'housing', 'dlf', 'godrej properties'],
     'NIFTY_PSU_BANK': ['psu bank', 'public sector bank', 'sbi', 'pnb', 'boi'],
     'NIFTY_PRIVATE_BANK': ['private bank', 'hdfc', 'icici', 'axis', 'kotak'],
+    'NIFTY_FIN_SERVICE': ['financial services', 'finance', 'financial', 'banking', 'insurance'],
+    'NIFTY_HEALTHCARE': ['healthcare', 'health care', 'hospital', 'medical', 'pharma'],
+    'NIFTY_CONSUMER_DURABLES': ['consumer durables', 'durables', 'appliances', 'whirlpool', 'voltas'],
+    'NIFTY_INFRA': ['infrastructure', 'infra', 'construction', 'l&t', 'larsen'],
+    'NIFTY_OIL_GAS': ['oil', 'gas', 'petroleum', 'ongc', 'oil india', 'gail'],
+    'NIFTY_PSE': ['psu', 'public sector', 'government company', 'psu stocks'],
+    'NIFTY_SERVICES': ['services', 'service sector'],
+    'NIFTY_COMMODITIES': ['commodities', 'commodity', 'agriculture', 'agri'],
+    # Thematic Indices
+    'NIFTY_GROWTH_SECTORS_15': ['growth', 'growth stocks', 'growth sectors'],
+    'NIFTY_DIVIDEND_OPPORTUNITIES_50': ['dividend', 'dividend yield', 'dividend stocks'],
+    'NIFTY_QUALITY_30': ['quality', 'quality stocks', 'quality index'],
+    'NIFTY_LOW_VOLATILITY_50': ['low volatility', 'low vol', 'stable stocks'],
+    'NIFTY_ALPHA_50': ['alpha', 'alpha stocks', 'outperformance'],
+    'NIFTY_HIGH_BETA_50': ['high beta', 'volatile', 'volatility'],
 }
 

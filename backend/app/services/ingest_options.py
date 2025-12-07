@@ -275,13 +275,19 @@ def fetch_options_from_kite(
         
         # Map underlying to Kite instrument token
         # NIFTY and BANKNIFTY are index options
+        # Most sectors map to NIFTY, banking sectors to BANKNIFTY
         underlying_map = {
             'NIFTY': 'NIFTY',
             'BANKNIFTY': 'BANKNIFTY',
-            'NIFTY_BANK': 'BANKNIFTY',  # Map sector to index
+            # Banking sectors
+            'NIFTY_BANK': 'BANKNIFTY',
+            'NIFTY_PSU_BANK': 'BANKNIFTY',
+            'NIFTY_PRIVATE_BANK': 'BANKNIFTY',
+            'NIFTY_FIN_SERVICE': 'BANKNIFTY',
+            # All other sectors map to NIFTY (default)
         }
         
-        kite_symbol = underlying_map.get(underlying, underlying)
+        kite_symbol = underlying_map.get(underlying, 'NIFTY')
         
         # Get instruments for NFO (NSE Futures & Options)
         instruments = kite.instruments("NFO")

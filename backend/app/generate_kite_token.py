@@ -16,7 +16,7 @@ def generate_access_token(request_token: str, api_key: str, api_secret: str):
     if not request_token:
         print("❌ Error: Request token required")
         print("\nTo get request token:")
-        print("1. Visit: https://kite.trade/connect/login?api_key=YOUR_API_KEY&v=3")
+        print("1. Visit: https://kite.trade/connect/login?api_key=j9cwrgsejy2vodgv&v=3")
         print("2. Login and authorize")
         print("3. Copy the request_token from the redirect URL")
         print("4. Run: python -m app.generate_kite_token <request_token>")
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     if len(sys.argv) < 2:
         print("Usage: python -m app.generate_kite_token <request_token>")
         print("\nTo get request token:")
-        print("1. Visit: https://kite.trade/connect/login?api_key=2pl8jdm3kobxu007&v=3")
+        print("1. Visit: https://kite.trade/connect/login?api_key=j9cwrgsejy2vodgv&v=3")
         print("2. Login and authorize")
         print("3. Copy the request_token from the redirect URL")
         sys.exit(1)

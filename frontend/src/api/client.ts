@@ -16,6 +16,9 @@ export interface SectorSummary {
   ret_1m: number;
   ret_1w: number;
   sparkline: number[];
+  valuation_pe?: number | null;
+  valuation_state?: 'cheap' | 'fair' | 'expensive' | null;
+  sentiment_score_7d?: number | null;
 }
 
 export interface ForecastDriver {
@@ -33,6 +36,28 @@ export interface ForecastResponse {
   prob_down: number;
   expected_return_pct: number;
   top_drivers: ForecastDriver[];
+  quarter_score?: number | null;
+  drivers?: Record<string, { score: number; detail: string }> | null;
+  derivatives_sentiment?: {
+    label: string;
+    pcr_oi: number | null;
+    oi_change_1d: number | null;
+    iv_index: number | null;
+    explanation: string;
+  } | null;
+}
+
+export interface QuarterOutlookSector {
+  sector_id: string;
+  name: string;
+  quarter_score: number;
+  forecast_3m_label: string;
+  expected_return_pct: number;
+}
+
+export interface QuarterOutlookResponse {
+  as_of: string;
+  sectors: QuarterOutlookSector[];
 }
 
 export interface TimeseriesPoint {
@@ -230,6 +255,115 @@ export const api = {
     const params: any = { limit };
     if (sectorId) params.sector_id = sectorId;
     const response = await client.get('/api/v1/analytics/news/latest', { params });
+    return response.data;
+  },
+
+  getQuarterOutlook: async (): Promise<QuarterOutlookResponse> => {
+    const response = await client.get('/api/v1/sectors/quarter-outlook');
+    return response.data;
+  },
+
+  // Sector Rotation APIs
+  getSectorRotationAvailableDates: async (level: 'sector' | 'industry' = 'sector'): Promise<string[]> => {
+    const response = await client.get('/api/v1/sector-rotation/available-dates', {
+      params: { level },
+    });
+    return response.data;
+  },
+
+  getSectorRotationBreadth: async (
+    level: 'sector' | 'industry',
+    date: string,
+    metricType: 'mcap' | 'count' = 'mcap'
+  ): Promise<{
+    date: string;
+    level: string;
+    metric_type: string;
+    data: Array<{
+      id: string;
+      name: string;
+      mcap: number;
+      stocks: number;
+      metrics: {
+        pct_rs55_gt0: number;
+        pct_rsi_gt50: number;
+        pct_above_sma20: number;
+        pct_above_sma50: number;
+        pct_above_sma100: number;
+      };
+    }>;
+  }> => {
+    const response = await client.get('/api/v1/sector-rotation/breadth', {
+      params: { level, date, metric_type: metricType },
+    });
+    return response.data;
+  },
+
+  getSectorRotationScores: async (
+    level: 'sector' | 'industry',
+    date: string
+  ): Promise<{
+    date: string;
+    level: string;
+    data: Array<{
+      id: string;
+      name: string;
+      mcap: number;
+      stocks: number;
+      score_1m: number;
+      score_3m: number;
+      score_6m: number;
+    }>;
+  }> => {
+    const response = await client.get('/api/v1/sector-rotation/scores', {
+      params: { level, date },
+    });
+    return response.data;
+  },
+
+  getSectorRotationDeliveries: async (
+    level: 'sector' | 'industry',
+    date: string
+  ): Promise<{
+    date: string;
+    level: string;
+    data: Array<{
+      id: string;
+      name: string;
+      stocks: number;
+      mcap: number;
+      mcap_change_abs: number;
+      mcap_change_pct: number;
+      traded_value: number;
+      traded_value_avg: number;
+      traded_value_multiple: number;
+      delivery_value: number;
+      delivery_value_avg: number;
+      delivery_value_multiple: number;
+    }>;
+  }> => {
+    const response = await client.get('/api/v1/sector-rotation/deliveries', {
+      params: { level, date },
+    });
+    return response.data;
+  },
+
+  getSectorRotationVWAP: async (
+    level: 'sector' | 'industry',
+    date: string
+  ): Promise<{
+    date: string;
+    level: string;
+    data: Array<{
+      id: string;
+      name: string;
+      mcap: number;
+      pct_mcap_price_above_vwap: number;
+    }>;
+  }> => {
+    const response = await client.get('/api/v1/sector-rotation/vwap', {
+      params: { level, date },
+    });
     return response.data;
   },
 };

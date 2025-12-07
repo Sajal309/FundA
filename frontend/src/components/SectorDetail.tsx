@@ -128,15 +128,15 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
     : [];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-          <h2 className="text-2xl font-bold text-gray-900">
+    <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
+      <div className="bg-dark-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto border border-dark-700">
+        <div className="sticky top-0 bg-dark-800 border-b border-dark-700 px-6 py-4 flex items-center justify-between z-10">
+          <h2 className="text-2xl font-bold text-dark-100">
             {sectorId.replace('NIFTY_', '')} Sector Details
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 text-2xl"
+            className="text-dark-400 hover:text-dark-200 text-2xl transition-colors"
           >
             ×
           </button>
@@ -144,16 +144,16 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
 
         <div className="p-6">
           {/* Tabs */}
-          <div className="mb-6 border-b border-gray-200">
+          <div className="mb-6 border-b border-dark-700">
             <nav className="flex space-x-8">
               {(['overview', 'analytics', 'options', 'sentiment', 'performance', 'risk'] as const).map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
                     activeTab === tab
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      ? 'border-blue-500 text-blue-400'
+                      : 'border-transparent text-dark-400 hover:text-dark-200 hover:border-dark-600'
                   }`}
                 >
                   {tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -169,30 +169,30 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
               {forecastLoading ? (
                 <div className="mb-6">Loading forecast...</div>
               ) : forecast ? (
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="text-lg font-semibold mb-3">3-Month Forecast</h3>
+                <div className="mb-6 p-4 bg-dark-700 rounded-lg border border-dark-600">
+                  <h3 className="text-lg font-semibold mb-3 text-dark-100">3-Month Forecast</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                     <div>
-                      <div className="text-sm text-gray-600">Forecast</div>
+                      <div className="text-sm text-dark-400">Forecast</div>
                       <div
                         className={`text-xl font-bold ${
                           forecast.forecast_3m_label === 'UP'
-                            ? 'text-green-600'
+                            ? 'text-green-400'
                             : forecast.forecast_3m_label === 'DOWN'
-                            ? 'text-red-600'
-                            : 'text-yellow-600'
+                            ? 'text-red-400'
+                            : 'text-yellow-400'
                         }`}
                       >
                         {forecast.forecast_3m_label}
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-600">Expected Return</div>
+                      <div className="text-sm text-dark-400">Expected Return</div>
                       <div
                         className={`text-xl font-bold ${
                           forecast.expected_return_pct >= 0
-                            ? 'text-green-600'
-                            : 'text-red-600'
+                            ? 'text-green-400'
+                            : 'text-red-400'
                         }`}
                       >
                         {forecast.expected_return_pct >= 0 ? '+' : ''}
@@ -200,15 +200,15 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-600">Prob. UP</div>
-                      <div className="text-xl font-bold">
-                        {(forecast.prob_up * 100).toFixed(0)}%
+                      <div className="text-sm text-dark-400">Prob. UP</div>
+                      <div className="text-xl font-bold text-dark-100">
+                        {(forecast.prob_up * 100).toFixed(2)}%
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-600">Prob. DOWN</div>
-                      <div className="text-xl font-bold">
-                        {(forecast.prob_down * 100).toFixed(0)}%
+                      <div className="text-sm text-dark-400">Prob. DOWN</div>
+                      <div className="text-xl font-bold text-dark-100">
+                        {(forecast.prob_down * 100).toFixed(2)}%
                       </div>
                     </div>
                   </div>
@@ -222,10 +222,10 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
                             <span
                               className={
                                 driver.impact === 'positive'
-                                  ? 'text-green-600'
+                                  ? 'text-green-400'
                                   : driver.impact === 'negative'
-                                  ? 'text-red-600'
-                                  : 'text-gray-600'
+                                  ? 'text-red-400'
+                                  : 'text-dark-400'
                               }
                             >
                               {driver.impact === 'positive' ? '↑' : driver.impact === 'negative' ? '↓' : '→'}{' '}
@@ -241,44 +241,44 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
 
               {/* Trend Analysis */}
               {trends && (
-                <div className="mb-6 p-4 bg-blue-50 rounded-lg">
+                <div className="mb-6 p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
                   <h3 className="text-lg font-semibold mb-3">Trend Analysis</h3>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                     <div>
-                      <div className="text-sm text-gray-600">Trend</div>
+                      <div className="text-sm text-dark-400">Trend</div>
                       <div className={`text-lg font-bold ${
-                        trends.trend === 'uptrend' ? 'text-green-600' :
-                        trends.trend === 'downtrend' ? 'text-red-600' : 'text-yellow-600'
+                        trends.trend === 'uptrend' ? 'text-green-400' :
+                        trends.trend === 'downtrend' ? 'text-red-400' : 'text-yellow-400'
                       }`}>
                         {trends.trend}
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-600">Volatility</div>
+                      <div className="text-sm text-dark-400">Volatility</div>
                       <div className={`text-lg font-bold ${
-                        trends.volatility_regime === 'high' ? 'text-red-600' :
-                        trends.volatility_regime === 'low' ? 'text-green-600' : 'text-yellow-600'
+                        trends.volatility_regime === 'high' ? 'text-red-400' :
+                        trends.volatility_regime === 'low' ? 'text-green-400' : 'text-yellow-400'
                       }`}>
                         {trends.volatility_regime}
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-600">Price Change</div>
+                      <div className="text-sm text-dark-400">Price Change</div>
                       <div className={`text-lg font-bold ${
-                        trends.price_change_pct >= 0 ? 'text-green-600' : 'text-red-600'
+                        trends.price_change_pct >= 0 ? 'text-green-400' : 'text-red-400'
                       }`}>
                         {trends.price_change_pct >= 0 ? '+' : ''}
                         {trends.price_change_pct.toFixed(2)}%
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-600">Current Vol</div>
+                      <div className="text-sm text-dark-400">Current Vol</div>
                       <div className="text-lg font-bold">
                         {trends.current_volatility ? trends.current_volatility.toFixed(2) : 'N/A'}
                       </div>
                     </div>
                     <div>
-                      <div className="text-sm text-gray-600">Avg Vol</div>
+                      <div className="text-sm text-dark-400">Avg Vol</div>
                       <div className="text-lg font-bold">
                         {trends.avg_volatility ? trends.avg_volatility.toFixed(2) : 'N/A'}
                       </div>
@@ -295,18 +295,21 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
                   <h3 className="text-lg font-semibold mb-3">Price & Volume</h3>
                   <ResponsiveContainer width="100%" height={400}>
                     <ComposedChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis
                         dataKey="date"
-                        tick={{ fontSize: 12 }}
+                        tick={{ fontSize: 12, fill: '#d1d5db' }}
                         angle={-45}
                         textAnchor="end"
                         height={80}
                       />
-                      <YAxis yAxisId="left" tick={{ fontSize: 12 }} />
-                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12 }} />
-                      <Tooltip />
-                      <Legend />
+                      <YAxis yAxisId="left" tick={{ fontSize: 12, fill: '#d1d5db' }} />
+                      <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 12, fill: '#d1d5db' }} />
+                      <Tooltip 
+                        contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', color: '#f3f4f6' }}
+                        labelStyle={{ color: '#f3f4f6' }}
+                      />
+                      <Legend wrapperStyle={{ color: '#d1d5db' }} />
                       <Area
                         yAxisId="left"
                         type="monotone"
@@ -356,34 +359,34 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
             <div>
               <h3 className="text-lg font-semibold mb-4">FII/DII Flows Analysis</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="p-4 bg-white rounded-lg border">
-                  <div className="text-sm text-gray-600">Total FII Net</div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+                  <div className="text-sm text-dark-400">Total FII Net</div>
                   <div className={`text-xl font-bold ${
-                    flows.total_fii_net >= 0 ? 'text-green-600' : 'text-red-600'
+                    flows.total_fii_net >= 0 ? 'text-green-400' : 'text-red-400'
                   }`}>
                     ₹{(flows.total_fii_net / 1000000).toFixed(2)} Cr
                   </div>
                 </div>
-                <div className="p-4 bg-white rounded-lg border">
-                  <div className="text-sm text-gray-600">Total DII Net</div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+                  <div className="text-sm text-dark-400">Total DII Net</div>
                   <div className={`text-xl font-bold ${
-                    flows.total_dii_net >= 0 ? 'text-green-600' : 'text-red-600'
+                    flows.total_dii_net >= 0 ? 'text-green-400' : 'text-red-400'
                   }`}>
                     ₹{(flows.total_dii_net / 1000000).toFixed(2)} Cr
                   </div>
                 </div>
-                <div className="p-4 bg-white rounded-lg border">
-                  <div className="text-sm text-gray-600">Avg Daily FII</div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+                  <div className="text-sm text-dark-400">Avg Daily FII</div>
                   <div className={`text-lg font-bold ${
-                    flows.avg_daily_fii >= 0 ? 'text-green-600' : 'text-red-600'
+                    flows.avg_daily_fii >= 0 ? 'text-green-400' : 'text-red-400'
                   }`}>
                     ₹{(flows.avg_daily_fii / 1000000).toFixed(2)} Cr
                   </div>
                 </div>
-                <div className="p-4 bg-white rounded-lg border">
-                  <div className="text-sm text-gray-600">Avg Daily DII</div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+                  <div className="text-sm text-dark-400">Avg Daily DII</div>
                   <div className={`text-lg font-bold ${
-                    flows.avg_daily_dii >= 0 ? 'text-green-600' : 'text-red-600'
+                    flows.avg_daily_dii >= 0 ? 'text-green-400' : 'text-red-400'
                   }`}>
                     ₹{(flows.avg_daily_dii / 1000000).toFixed(2)} Cr
                   </div>
@@ -392,11 +395,14 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
               {flowsChartData.length > 0 && (
                 <ResponsiveContainer width="100%" height={300}>
                   <ComposedChart data={flowsChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
-                    <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Legend />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#d1d5db' }} angle={-45} textAnchor="end" height={80} />
+                    <YAxis tick={{ fontSize: 10, fill: '#d1d5db' }} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', color: '#f3f4f6' }}
+                      labelStyle={{ color: '#f3f4f6' }}
+                    />
+                    <Legend wrapperStyle={{ color: '#d1d5db' }} />
                     <Bar dataKey="fii" fill="#10b981" name="FII (Cr)" />
                     <Bar dataKey="dii" fill="#3b82f6" name="DII (Cr)" />
                   </ComposedChart>
@@ -410,29 +416,29 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
             <div>
               <h3 className="text-lg font-semibold mb-4">Options Analysis ({underlying})</h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-                <div className="p-4 bg-white rounded-lg border">
-                  <div className="text-sm text-gray-600">Current PCR</div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+                  <div className="text-sm text-dark-400">Current PCR</div>
                   <div className="text-xl font-bold">
                     {options.current_pcr ? options.current_pcr.toFixed(2) : 'N/A'}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-dark-500">
                     Avg: {options.avg_pcr ? options.avg_pcr.toFixed(2) : 'N/A'}
                   </div>
                 </div>
-                <div className="p-4 bg-white rounded-lg border">
-                  <div className="text-sm text-gray-600">OI Change 1D</div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+                  <div className="text-sm text-dark-400">OI Change 1D</div>
                   <div className={`text-xl font-bold ${
-                    (options.current_oi_change || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                    (options.current_oi_change || 0) >= 0 ? 'text-green-400' : 'text-red-400'
                   }`}>
                     {options.current_oi_change ? (options.current_oi_change >= 0 ? '+' : '') + options.current_oi_change.toFixed(2) + '%' : 'N/A'}
                   </div>
                 </div>
-                <div className="p-4 bg-white rounded-lg border">
-                  <div className="text-sm text-gray-600">IV Index</div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+                  <div className="text-sm text-dark-400">IV Index</div>
                   <div className="text-xl font-bold">
                     {options.current_iv ? (options.current_iv * 100).toFixed(2) + '%' : 'N/A'}
                   </div>
-                  <div className="text-xs text-gray-500">
+                  <div className="text-xs text-dark-500">
                     Avg: {options.avg_iv ? (options.avg_iv * 100).toFixed(2) + '%' : 'N/A'}
                   </div>
                 </div>
@@ -440,12 +446,15 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
               {optionsChartData.length > 0 && (
                 <ResponsiveContainer width="100%" height={300}>
                   <ComposedChart data={optionsChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Legend />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#d1d5db' }} angle={-45} textAnchor="end" height={80} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#d1d5db' }} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#d1d5db' }} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', color: '#f3f4f6' }}
+                      labelStyle={{ color: '#f3f4f6' }}
+                    />
+                    <Legend wrapperStyle={{ color: '#d1d5db' }} />
                     <Line yAxisId="left" type="monotone" dataKey="pcr" stroke="#8b5cf6" strokeWidth={2} name="PCR" />
                     <Bar yAxisId="right" dataKey="oi_change" fill="#f59e0b" name="OI Change %" />
                     <Line yAxisId="left" type="monotone" dataKey="iv" stroke="#ef4444" strokeWidth={2} name="IV %" />
@@ -460,34 +469,34 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
             <div>
               <h3 className="text-lg font-semibold mb-4">Sentiment Analysis</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div className="p-4 bg-white rounded-lg border">
-                  <div className="text-sm text-gray-600">Current (1D)</div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+                  <div className="text-sm text-dark-400">Current (1D)</div>
                   <div className={`text-xl font-bold ${
-                    (sentiment.current_sentiment_1d || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                    (sentiment.current_sentiment_1d || 0) >= 0 ? 'text-green-400' : 'text-red-400'
                   }`}>
                     {sentiment.current_sentiment_1d !== null ? sentiment.current_sentiment_1d.toFixed(2) : 'N/A'}
                   </div>
                 </div>
-                <div className="p-4 bg-white rounded-lg border">
-                  <div className="text-sm text-gray-600">Current (7D)</div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+                  <div className="text-sm text-dark-400">Current (7D)</div>
                   <div className={`text-xl font-bold ${
-                    (sentiment.current_sentiment_7d || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                    (sentiment.current_sentiment_7d || 0) >= 0 ? 'text-green-400' : 'text-red-400'
                   }`}>
                     {sentiment.current_sentiment_7d !== null ? sentiment.current_sentiment_7d.toFixed(2) : 'N/A'}
                   </div>
                 </div>
-                <div className="p-4 bg-white rounded-lg border">
-                  <div className="text-sm text-gray-600">Trend</div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+                  <div className="text-sm text-dark-400">Trend</div>
                   <div className={`text-xl font-bold ${
-                    sentiment.sentiment_trend === 'improving' ? 'text-green-600' : 'text-red-600'
+                    sentiment.sentiment_trend === 'improving' ? 'text-green-400' : 'text-red-400'
                   }`}>
                     {sentiment.sentiment_trend}
                   </div>
                 </div>
-                <div className="p-4 bg-white rounded-lg border">
-                  <div className="text-sm text-gray-600">Avg (7D)</div>
+                <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+                  <div className="text-sm text-dark-400">Avg (7D)</div>
                   <div className={`text-lg font-bold ${
-                    (sentiment.avg_sentiment_7d || 0) >= 0 ? 'text-green-600' : 'text-red-600'
+                    (sentiment.avg_sentiment_7d || 0) >= 0 ? 'text-green-400' : 'text-red-400'
                   }`}>
                     {sentiment.avg_sentiment_7d !== null ? sentiment.avg_sentiment_7d.toFixed(2) : 'N/A'}
                   </div>
@@ -496,12 +505,15 @@ function SectorDetail({ sectorId, onClose }: SectorDetailProps) {
               {sentimentChartData.length > 0 && (
                 <ResponsiveContainer width="100%" height={300}>
                   <ComposedChart data={sentimentChartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
-                    <YAxis yAxisId="left" tick={{ fontSize: 10 }} />
-                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10 }} />
-                    <Tooltip />
-                    <Legend />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
+                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#d1d5db' }} angle={-45} textAnchor="end" height={80} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#d1d5db' }} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#d1d5db' }} />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', color: '#f3f4f6' }}
+                      labelStyle={{ color: '#f3f4f6' }}
+                    />
+                    <Legend wrapperStyle={{ color: '#d1d5db' }} />
                     <Line yAxisId="left" type="monotone" dataKey="sentiment_1d" stroke="#10b981" strokeWidth={2} name="Sentiment 1D" />
                     <Line yAxisId="left" type="monotone" dataKey="sentiment_7d" stroke="#3b82f6" strokeWidth={2} name="Sentiment 7D" />
                     <Bar yAxisId="right" dataKey="headlines" fill="#94a3b8" name="Headlines" opacity={0.5} />

@@ -1,5 +1,6 @@
 import { useQuery } from 'react-query';
 import { api, BetaMetrics } from '../api/client';
+import { formatPercent, formatNumber } from '../utils/formatting';
 
 interface RiskMetricsProps {
   sectorId: string;
@@ -16,24 +17,21 @@ function RiskMetrics({ sectorId, marketSectorId = 'NIFTY_50', lookbackDays = 252
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Risk Metrics</h3>
-        <div className="text-gray-500">Loading...</div>
+      <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+        <h3 className="text-lg font-semibold mb-4 text-dark-100">Risk Metrics</h3>
+        <div className="text-dark-400">Loading...</div>
       </div>
     );
   }
 
   if (!metrics) {
     return (
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-semibold mb-4">Risk Metrics</h3>
-        <div className="text-gray-500">No data available</div>
+      <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+        <h3 className="text-lg font-semibold mb-4 text-dark-100">Risk Metrics</h3>
+        <div className="text-dark-400">No data available</div>
       </div>
     );
   }
-
-  const formatPercent = (value: number) => `${value >= 0 ? '+' : ''}${(value * 100).toFixed(2)}%`;
-  const formatNumber = (value: number) => value.toFixed(2);
 
   const getBetaColor = (beta: number) => {
     if (beta > 1.2) return 'text-red-600';
@@ -48,48 +46,48 @@ function RiskMetrics({ sectorId, marketSectorId = 'NIFTY_50', lookbackDays = 252
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold mb-4">Risk Metrics vs {marketSectorId.replace('NIFTY_', '')}</h3>
+    <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
+      <h3 className="text-lg font-semibold mb-4 text-dark-100">Risk Metrics vs {marketSectorId.replace('NIFTY_', '')}</h3>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-          <div className="text-sm text-gray-600 mb-1">Beta</div>
-          <div className={`text-2xl font-bold ${getBetaColor(metrics.beta)}`}>
+        <div className="p-4 bg-red-900/20 rounded-lg border border-red-800/50">
+          <div className="text-sm text-dark-400 mb-1">Beta</div>
+          <div className={`text-2xl font-bold ${getBetaColor(metrics.beta).replace('600', '400')}`}>
             {formatNumber(metrics.beta)}
           </div>
-          <div className="text-xs text-gray-500 mt-1">{getBetaLabel(metrics.beta)}</div>
+          <div className="text-xs text-dark-400 mt-1">{getBetaLabel(metrics.beta)}</div>
         </div>
-        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-          <div className="text-sm text-gray-600 mb-1">Correlation</div>
-          <div className="text-2xl font-bold text-blue-600">
+        <div className="p-4 bg-blue-900/20 rounded-lg border border-blue-800/50">
+          <div className="text-sm text-dark-400 mb-1">Correlation</div>
+          <div className="text-2xl font-bold text-blue-400">
             {formatNumber(metrics.correlation_to_market)}
           </div>
-          <div className="text-xs text-gray-500 mt-1">
+          <div className="text-xs text-dark-400 mt-1">
             {Math.abs(metrics.correlation_to_market) > 0.7 ? 'High correlation' : 
              Math.abs(metrics.correlation_to_market) > 0.4 ? 'Moderate' : 'Low correlation'}
           </div>
         </div>
-        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-          <div className="text-sm text-gray-600 mb-1">Alpha</div>
-          <div className={`text-2xl font-bold ${metrics.alpha >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        <div className="p-4 bg-green-900/20 rounded-lg border border-green-800/50">
+          <div className="text-sm text-dark-400 mb-1">Alpha</div>
+          <div className={`text-2xl font-bold ${metrics.alpha >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {formatPercent(metrics.alpha)}
           </div>
-          <div className="text-xs text-gray-500 mt-1">Excess return</div>
+          <div className="text-xs text-dark-400 mt-1">Excess return</div>
         </div>
-        <div className="p-4 bg-gray-50 rounded-lg border">
-          <div className="text-sm text-gray-600 mb-1">Sector Return</div>
-          <div className={`text-xl font-bold ${metrics.sector_return >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+          <div className="text-sm text-dark-400 mb-1">Sector Return</div>
+          <div className={`text-xl font-bold ${metrics.sector_return >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {formatPercent(metrics.sector_return)}
           </div>
         </div>
-        <div className="p-4 bg-gray-50 rounded-lg border">
-          <div className="text-sm text-gray-600 mb-1">Market Return</div>
-          <div className={`text-xl font-bold ${metrics.market_return >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        <div className="p-4 bg-dark-700 rounded-lg border border-dark-600">
+          <div className="text-sm text-dark-400 mb-1">Market Return</div>
+          <div className={`text-xl font-bold ${metrics.market_return >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {formatPercent(metrics.market_return)}
           </div>
         </div>
       </div>
-      <div className="mt-4 p-3 bg-gray-50 rounded text-sm text-gray-600">
-        <strong>Beta Interpretation:</strong> Beta &gt; 1 means the sector moves more than the market. 
+      <div className="mt-4 p-3 bg-dark-700 rounded text-sm text-dark-300">
+        <strong className="text-dark-100">Beta Interpretation:</strong> Beta &gt; 1 means the sector moves more than the market. 
         Beta &lt; 1 means it moves less. Beta = 1 means it moves with the market.
       </div>
     </div>
