@@ -105,8 +105,11 @@ function MarketSentiment() {
       {/* Sentiment Indicators Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {/* VIX */}
-        <div className="bg-dark-700 rounded-lg p-4">
-          <div className="text-xs text-dark-400 mb-1">India VIX</div>
+        <div className="bg-dark-700 rounded-lg p-4 relative group">
+          <div className="text-xs text-dark-400 mb-1 flex items-center">
+            India VIX
+            <span className="ml-1 text-dark-500 cursor-help" title="India VIX measures market volatility expectations. Lower values indicate calmer markets.">ℹ️</span>
+          </div>
           <div className={`text-2xl font-bold ${getVixColor(data.india_vix)}`}>
             {data.india_vix !== null ? data.india_vix.toFixed(2) : 'N/A'}
           </div>
@@ -119,8 +122,11 @@ function MarketSentiment() {
         </div>
 
         {/* PCR */}
-        <div className="bg-dark-700 rounded-lg p-4">
-          <div className="text-xs text-dark-400 mb-1">Put-Call Ratio</div>
+        <div className="bg-dark-700 rounded-lg p-4 relative group">
+          <div className="text-xs text-dark-400 mb-1 flex items-center">
+            Put-Call Ratio
+            <span className="ml-1 text-dark-500 cursor-help" title="Put-Call Ratio (PCR) measures options market sentiment. Lower values (&lt;0.7) indicate bullish sentiment, higher values (&gt;1.3) indicate bearish sentiment.">ℹ️</span>
+          </div>
           <div className={`text-2xl font-bold ${getPcrColor(data.index_pcr)}`}>
             {data.index_pcr !== null ? data.index_pcr.toFixed(2) : 'N/A'}
           </div>
@@ -128,8 +134,11 @@ function MarketSentiment() {
         </div>
 
         {/* Breadth */}
-        <div className="bg-dark-700 rounded-lg p-4">
-          <div className="text-xs text-dark-400 mb-1">Market Breadth</div>
+        <div className="bg-dark-700 rounded-lg p-4 relative group">
+          <div className="text-xs text-dark-400 mb-1 flex items-center">
+            Market Breadth
+            <span className="ml-1 text-dark-500 cursor-help" title="Market Breadth measures how many stocks are participating in the trend. Higher values (&gt;60%) indicate broad market strength, lower values (&lt;40%) indicate narrow participation.">ℹ️</span>
+          </div>
           <div className={`text-2xl font-bold ${getBreadthColor(data.breadth_nifty500_above_50dma)}`}>
             {data.breadth_nifty500_above_50dma !== null ? `${(data.breadth_nifty500_above_50dma * 100).toFixed(2)}%` : 'N/A'}
           </div>
@@ -139,8 +148,11 @@ function MarketSentiment() {
         </div>
 
         {/* News Sentiment */}
-        <div className="bg-dark-700 rounded-lg p-4">
-          <div className="text-xs text-dark-400 mb-1">News Sentiment</div>
+        <div className="bg-dark-700 rounded-lg p-4 relative group">
+          <div className="text-xs text-dark-400 mb-1 flex items-center">
+            News Sentiment
+            <span className="ml-1 text-dark-500 cursor-help" title="News Sentiment measures the tone of financial news. Scores above 55 indicate positive sentiment, below 45 indicate negative sentiment. Based on 7-day rolling average.">ℹ️</span>
+          </div>
           <div className={`text-2xl font-bold ${getSentimentColor(data.news_sentiment_score_7d)}`}>
             {data.news_sentiment_score_7d !== null ? data.news_sentiment_score_7d.toFixed(2) : 'N/A'}
           </div>
@@ -150,11 +162,6 @@ function MarketSentiment() {
         </div>
       </div>
 
-      {/* Regime Explanation */}
-      <div className="mt-4 p-3 bg-dark-700 rounded-lg text-xs text-dark-300">
-        <strong className="text-dark-100">Regime Rules:</strong> RISK-ON = Low VIX (&lt;30th %ile) + Broad Breadth (&gt;60%) + Positive News (&gt;55) + Balanced PCR (0.7-1.2) | 
-        RISK-OFF = High VIX (&gt;70th %ile) + Narrow Breadth (&lt;40%) + Negative News (&lt;45)
-      </div>
     </div>
   );
 }

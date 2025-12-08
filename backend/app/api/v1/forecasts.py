@@ -83,6 +83,16 @@ def get_flows(
     return result
 
 
+def get_quarter_score_label(score: float) -> str:
+    """Map QuarterScore to label based on thresholds."""
+    if score >= 1.5:
+        return "Strong"
+    elif score >= -0.5:
+        return "Neutral"
+    else:
+        return "Weak"
+
+
 @router.get("/sectors/quarter-outlook")
 def get_quarter_outlook(
     db: Session = Depends(database.get_db)
@@ -91,14 +101,16 @@ def get_quarter_outlook(
     Get Quarter Outlook ranking for all sectors.
     
     Returns sectors sorted by quarter_score (descending).
+    Only includes canonical sectors.
     """
     from app.api.v1.sectors import SECTOR_NAMES
+    from app.utils.sectors import get_canonical_sector_ids
     
-    # Get latest forecasts for all sectors
-    sectors = crud.get_all_sectors(db)
+    # Only use canonical sectors
+    canonical_sectors = get_canonical_sector_ids()
     sector_forecasts = []
     
-    for sector_id in sectors:
+    for sector_id in canonical_sectors:
         forecast = crud.get_latest_sector_forecast(db, sector_id)
         
         # If no forecast or forecast doesn't have quarter_score, generate one
@@ -110,10 +122,12 @@ def get_quarter_outlook(
                 continue
         
         if forecast and forecast.quarter_score is not None:
+            quarter_score = float(forecast.quarter_score)
             sector_forecasts.append({
                 "sector_id": sector_id,
                 "name": SECTOR_NAMES.get(sector_id, sector_id),
-                "quarter_score": forecast.quarter_score,
+                "quarter_score": quarter_score,
+                "label": get_quarter_score_label(quarter_score),
                 "forecast_3m_label": forecast.forecast_3m_label,
                 "expected_return_pct": forecast.expected_return_pct,
             })

@@ -1,7 +1,7 @@
 """FastAPI application entry point."""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api.v1 import sectors, forecasts, metrics, analytics, earnings, backtest, sector_rotation
+from app.api.v1 import sectors, forecasts, metrics, analytics, earnings, backtest, sector_rotation, screener
 from app.db import models, database
 
 # Create database tables
@@ -32,6 +32,7 @@ app.include_router(analytics.router, prefix="/api/v1", tags=["analytics"])
 app.include_router(earnings.router, prefix="/api/v1", tags=["earnings"])
 app.include_router(backtest.router, prefix="/api/v1", tags=["backtest"])
 app.include_router(sector_rotation.router, prefix="/api/v1", tags=["sector-rotation"])
+app.include_router(screener.router, prefix="/api/v1", tags=["screener"])
 
 
 @app.get("/healthz")

@@ -186,17 +186,20 @@ def get_breadth(
     db: Session = Depends(database.get_db)
 ):
     """
-    Get breadth metrics for all sectors.
+    Get breadth metrics for canonical sectors only.
     
     Returns:
         Dictionary with sectors and their breadth metrics (above 50DMA, 200DMA, 3M highs/lows)
+        Only includes canonical Nifty sector indices.
     """
     from datetime import date, timedelta
     from sqlalchemy import desc
     import pandas as pd
     import numpy as np
+    from app.utils.sectors import get_canonical_sector_ids
     
-    sectors = crud.get_all_sectors(db)
+    # Only use canonical sectors
+    sectors = get_canonical_sector_ids()
     result = []
     
     # Get latest date from breadth data or use today

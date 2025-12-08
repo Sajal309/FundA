@@ -1,7 +1,7 @@
 """Analytics API endpoints."""
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 from datetime import date
 from app.db import database
 from app.services import analytics
@@ -25,6 +25,26 @@ def get_sector_correlations(
         db, from_date=from_date, to_date=to_date, lookback_days=lookback_days
     )
     return {"correlations": correlations}
+
+
+@router.get("/sectors/top-correlations")
+def get_top_correlations(
+    lookback_days: int = Query(30, description="Number of days to look back"),
+    top_n: int = Query(5, description="Number of top correlations to return"),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Get top positive and negative correlations between canonical sectors.
+    
+    Returns:
+        Dictionary with 'top_positive' and 'top_negative' lists
+    """
+    from datetime import date
+    result = analytics.get_top_correlations(db, lookback_days=lookback_days, top_n=top_n)
+    return {
+        "as_of": date.today().isoformat(),
+        **result
+    }
 
 
 @router.get("/analytics/sectors/{sector_id}/trends")

@@ -372,6 +372,81 @@ class StockRollingStats(Base):
     )
 
 
+class StockFundamentals(Base):
+    """Fundamental data for stocks (similar to Screener.in metrics)."""
+    __tablename__ = "stock_fundamentals"
+    
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    ticker = Column(String, nullable=False, index=True)
+    date = Column(Date, nullable=False, index=True)  # As of date for the fundamentals
+    
+    # Basic metrics
+    market_cap = Column(Numeric(20, 2), nullable=True)  # Market cap in INR (crores)
+    
+    # Profitability
+    roe = Column(Numeric(6, 2), nullable=True)  # Return on Equity %
+    roce = Column(Numeric(6, 2), nullable=True)  # Return on Capital Employed %
+    roa = Column(Numeric(6, 2), nullable=True)  # Return on Assets % (for banks)
+    
+    # Margins
+    operating_margin = Column(Numeric(6, 2), nullable=True)  # Operating Profit Margin %
+    ebit_margin = Column(Numeric(6, 2), nullable=True)  # EBIT Margin %
+    ebitda_margin = Column(Numeric(6, 2), nullable=True)  # EBITDA Margin %
+    gross_margin = Column(Numeric(6, 2), nullable=True)  # Gross Margin %
+    net_margin = Column(Numeric(6, 2), nullable=True)  # Net Profit Margin %
+    
+    # Growth
+    sales_growth_5y = Column(Numeric(6, 2), nullable=True)  # Sales CAGR 5 Years %
+    profit_growth_5y = Column(Numeric(6, 2), nullable=True)  # Profit CAGR 5 Years %
+    revenue_growth_5y = Column(Numeric(6, 2), nullable=True)  # Revenue CAGR 5 Years %
+    
+    # Leverage
+    debt_to_equity = Column(Numeric(8, 2), nullable=True)  # Debt to Equity ratio
+    interest_coverage = Column(Numeric(8, 2), nullable=True)  # Interest Coverage ratio
+    
+    # Bank-specific metrics
+    net_interest_margin = Column(Numeric(6, 2), nullable=True)  # Net Interest Margin % (NIM)
+    gross_npa = Column(Numeric(6, 2), nullable=True)  # Gross NPA %
+    net_npa = Column(Numeric(6, 2), nullable=True)  # Net NPA %
+    provision_coverage = Column(Numeric(6, 2), nullable=True)  # Provision Coverage Ratio %
+    casa_ratio = Column(Numeric(6, 2), nullable=True)  # CASA Ratio %
+    capital_adequacy = Column(Numeric(6, 2), nullable=True)  # Capital Adequacy Ratio %
+    
+    # NBFC-specific
+    aum_growth_5y = Column(Numeric(6, 2), nullable=True)  # AUM Growth 5 Years %
+    
+    # Insurance-specific
+    solvency_ratio = Column(Numeric(6, 2), nullable=True)  # Solvency Ratio
+    vnb_margin = Column(Numeric(6, 2), nullable=True)  # Value of New Business Margin %
+    embedded_value_growth_5y = Column(Numeric(6, 2), nullable=True)  # Embedded Value Growth 5Y %
+    opex_to_sales = Column(Numeric(6, 2), nullable=True)  # Operating Expense to Sales %
+    
+    # Pharma/Export-oriented
+    rnd_to_sales = Column(Numeric(6, 2), nullable=True)  # R&D to Sales %
+    export_share = Column(Numeric(6, 2), nullable=True)  # Export Revenue %
+    
+    # Healthcare-specific
+    bed_occupancy = Column(Numeric(6, 2), nullable=True)  # Bed Occupancy %
+    
+    # Real Estate
+    inventory_days = Column(Integer, nullable=True)  # Inventory Days
+    
+    # Capital Goods/Infrastructure
+    order_book_growth_3y = Column(Numeric(6, 2), nullable=True)  # Order Book Growth 3Y %
+    order_book_to_sales = Column(Numeric(8, 2), nullable=True)  # Order Book to Sales ratio
+    order_book_visibility_years = Column(Numeric(4, 1), nullable=True)  # Order Book Visibility (Years)
+    
+    # Telecom
+    arpu_growth = Column(Numeric(6, 2), nullable=True)  # ARPU Growth %
+    
+    # Cash Flow
+    free_cash_flow = Column(Numeric(20, 2), nullable=True)  # Free Cash Flow (Rs. Cr.)
+    
+    __table_args__ = (
+        UniqueConstraint("ticker", "date", name="uq_stock_fundamentals"),
+    )
+
+
 # Sector Rotation Aggregation Tables
 
 class SectorBreadthSnapshot(Base):
@@ -435,14 +510,8 @@ class SectorMomentumScore(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     sector_id = Column(String, nullable=False, index=True)
-    total_mcap = Column(Numeric(20, 2), nullable=False)
-    total_stocks = Column(Integer, nullable=False)
-    score_1m = Column(Float, nullable=True)  # 0-100
-    score_3m = Column(Float, nullable=True)  # 0-100
-    score_6m = Column(Float, nullable=True)  # 0-100
-    return_1m = Column(Float, nullable=True)  # Raw return %
-    return_3m = Column(Float, nullable=True)  # Raw return %
-    return_6m = Column(Float, nullable=True)  # Raw return %
+    momentum_score = Column(Float, nullable=False)  # Normalized score
+    momentum_rank = Column(Integer, nullable=True)  # Rank among all sectors
     
     __table_args__ = (
         UniqueConstraint("sector_id", "date", name="uq_sector_momentum_scores"),
@@ -456,14 +525,8 @@ class IndustryMomentumScore(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     industry_id = Column(String, nullable=False, index=True)
-    total_mcap = Column(Numeric(20, 2), nullable=False)
-    total_stocks = Column(Integer, nullable=False)
-    score_1m = Column(Float, nullable=True)  # 0-100
-    score_3m = Column(Float, nullable=True)  # 0-100
-    score_6m = Column(Float, nullable=True)  # 0-100
-    return_1m = Column(Float, nullable=True)  # Raw return %
-    return_3m = Column(Float, nullable=True)  # Raw return %
-    return_6m = Column(Float, nullable=True)  # Raw return %
+    momentum_score = Column(Float, nullable=False)  # Normalized score
+    momentum_rank = Column(Integer, nullable=True)  # Rank among all industries
     
     __table_args__ = (
         UniqueConstraint("industry_id", "date", name="uq_industry_momentum_scores"),
@@ -477,16 +540,9 @@ class SectorDeliveryStats(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     sector_id = Column(String, nullable=False, index=True)
-    stocks_count = Column(Integer, nullable=False)
-    sector_mcap = Column(Numeric(20, 2), nullable=False)  # In crores
-    sector_mcap_change_abs = Column(Numeric(20, 2), nullable=True)  # Change from prev day
-    sector_mcap_change_pct = Column(Float, nullable=True)  # % change
-    traded_value = Column(Numeric(20, 2), nullable=True)  # Total traded value in crores
-    traded_value_avg = Column(Numeric(20, 2), nullable=True)  # 20-day average
-    traded_value_multiple = Column(Float, nullable=True)  # traded_value / traded_value_avg
-    delivery_value = Column(Numeric(20, 2), nullable=True)  # Total delivery value in crores
-    delivery_value_avg = Column(Numeric(20, 2), nullable=True)  # 20-day average
-    delivery_value_multiple = Column(Float, nullable=True)  # delivery_value / delivery_value_avg
+    avg_delivery_pct = Column(Float, nullable=True)  # Average delivery % (0-1)
+    total_delivery_value = Column(Numeric(20, 2), nullable=True)  # Total delivery value
+    total_traded_value = Column(Numeric(20, 2), nullable=True)  # Total traded value
     
     __table_args__ = (
         UniqueConstraint("sector_id", "date", name="uq_sector_delivery_stats"),
@@ -500,16 +556,9 @@ class IndustryDeliveryStats(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     industry_id = Column(String, nullable=False, index=True)
-    stocks_count = Column(Integer, nullable=False)
-    industry_mcap = Column(Numeric(20, 2), nullable=False)  # In crores
-    industry_mcap_change_abs = Column(Numeric(20, 2), nullable=True)  # Change from prev day
-    industry_mcap_change_pct = Column(Float, nullable=True)  # % change
-    traded_value = Column(Numeric(20, 2), nullable=True)  # Total traded value in crores
-    traded_value_avg = Column(Numeric(20, 2), nullable=True)  # 20-day average
-    traded_value_multiple = Column(Float, nullable=True)  # traded_value / traded_value_avg
-    delivery_value = Column(Numeric(20, 2), nullable=True)  # Total delivery value in crores
-    delivery_value_avg = Column(Numeric(20, 2), nullable=True)  # 20-day average
-    delivery_value_multiple = Column(Float, nullable=True)  # delivery_value / delivery_value_avg
+    avg_delivery_pct = Column(Float, nullable=True)  # Average delivery % (0-1)
+    total_delivery_value = Column(Numeric(20, 2), nullable=True)  # Total delivery value
+    total_traded_value = Column(Numeric(20, 2), nullable=True)  # Total traded value
     
     __table_args__ = (
         UniqueConstraint("industry_id", "date", name="uq_industry_delivery_stats"),
@@ -523,8 +572,8 @@ class SectorVWAPSnapshot(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     sector_id = Column(String, nullable=False, index=True)
-    total_mcap = Column(Numeric(20, 2), nullable=False)
-    pct_mcap_price_above_vwap = Column(Float, nullable=True)  # 0-1
+    vwap = Column(Numeric(15, 2), nullable=True)  # Market-cap weighted VWAP
+    price_vs_vwap_pct = Column(Float, nullable=True)  # Current price vs VWAP %
     
     __table_args__ = (
         UniqueConstraint("sector_id", "date", name="uq_sector_vwap_snapshots"),
@@ -538,10 +587,9 @@ class IndustryVWAPSnapshot(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     industry_id = Column(String, nullable=False, index=True)
-    total_mcap = Column(Numeric(20, 2), nullable=False)
-    pct_mcap_price_above_vwap = Column(Float, nullable=True)  # 0-1
+    vwap = Column(Numeric(15, 2), nullable=True)  # Market-cap weighted VWAP
+    price_vs_vwap_pct = Column(Float, nullable=True)  # Current price vs VWAP %
     
     __table_args__ = (
         UniqueConstraint("industry_id", "date", name="uq_industry_vwap_snapshots"),
     )
-

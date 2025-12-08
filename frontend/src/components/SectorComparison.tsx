@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from 'react-query';
 import { api, SectorSummary } from '../api/client';
 import {
@@ -14,13 +14,31 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+// Canonical sectors list
+const CANONICAL_SECTORS = [
+  'NIFTY_AUTO',
+  'NIFTY_BANK',
+  'NIFTY_FMCG',
+  'NIFTY_IT',
+  'NIFTY_PHARMA',
+  'NIFTY_METAL',
+  'NIFTY_REALTY',
+  'NIFTY_ENERGY',
+  'NIFTY_INFRA',
+];
+
 interface SectorComparisonProps {
   sectors: SectorSummary[];
 }
 
 function SectorComparison({ sectors }: SectorComparisonProps) {
+  // Filter to canonical sectors only
+  const canonicalSectors = useMemo(() => {
+    return sectors.filter(s => CANONICAL_SECTORS.includes(s.sector_id));
+  }, [sectors]);
+
   const [selectedSectors, setSelectedSectors] = useState<string[]>(
-    sectors.slice(0, 3).map((s) => s.sector_id)
+    canonicalSectors.slice(0, 3).map((s) => s.sector_id)
   );
   const [metric, setMetric] = useState<'returns' | 'sentiment'>('returns');
 
@@ -48,20 +66,22 @@ function SectorComparison({ sectors }: SectorComparisonProps) {
     setSelectedSectors((prev) =>
       prev.includes(sectorId)
         ? prev.filter((id) => id !== sectorId)
-        : [...prev, sectorId].slice(0, 5) // Max 5 sectors
+        : [...prev, sectorId].slice(0, 3) // Max 3 sectors for quarter outlook
     );
   };
 
   // Prepare chart data
   const chartData = comparison?.comparison
     ? Object.entries(comparison.comparison).map(([sectorId, values]: [string, any]) => {
-        const sector = sectors.find((s) => s.sector_id === sectorId);
+        const sector = canonicalSectors.find((s) => s.sector_id === sectorId);
         if (metric === 'returns') {
+          // Values: [ret_1m, ret_3m, ret_6m, rel_3m_vs_nifty]
           return {
             sector: sector?.name || sectorId.replace('NIFTY_', ''),
-            '1D': values[0] * 100,
-            '5D': values[1] * 100,
-            '1M': values[2] * 100,
+            '1M': (values[0] || 0) * 100,
+            '3M': (values[1] || 0) * 100,
+            '6M': (values[2] || 0) * 100,
+            '3M vs Nifty': (values[3] || 0) * 100,
           };
         } else {
           return {
@@ -103,9 +123,9 @@ function SectorComparison({ sectors }: SectorComparisonProps) {
 
       {/* Sector Selection */}
       <div className="mb-4">
-        <div className="text-sm text-dark-400 mb-2">Select sectors to compare (max 5):</div>
+        <div className="text-sm text-dark-400 mb-2">Select sectors to compare (max 3):</div>
         <div className="flex flex-wrap gap-2">
-          {sectors.map((sector) => (
+          {canonicalSectors.map((sector) => (
             <button
               key={sector.sector_id}
               onClick={() => handleSectorToggle(sector.sector_id)}
@@ -136,9 +156,10 @@ function SectorComparison({ sectors }: SectorComparisonProps) {
                 labelStyle={{ color: '#f3f4f6' }}
               />
               <Legend wrapperStyle={{ color: '#d1d5db' }} />
-              <Bar dataKey="1D" fill="#3b82f6" name="1 Day Return %" />
-              <Bar dataKey="5D" fill="#10b981" name="5 Day Return %" />
-              <Bar dataKey="1M" fill="#f59e0b" name="1 Month Return %" />
+              <Bar dataKey="1M" fill="#3b82f6" name="1 Month Return %" />
+              <Bar dataKey="3M" fill="#10b981" name="3 Month Return %" />
+              <Bar dataKey="6M" fill="#f59e0b" name="6 Month Return %" />
+              <Bar dataKey="3M vs Nifty" fill="#8b5cf6" name="3M vs Nifty %" />
             </BarChart>
           ) : (
             <LineChart data={chartData}>

@@ -1,5 +1,19 @@
+import { useMemo } from 'react';
 import { useQuery } from 'react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+
+// Canonical sectors list
+const CANONICAL_SECTORS = [
+  'NIFTY_AUTO',
+  'NIFTY_BANK',
+  'NIFTY_FMCG',
+  'NIFTY_IT',
+  'NIFTY_PHARMA',
+  'NIFTY_METAL',
+  'NIFTY_REALTY',
+  'NIFTY_ENERGY',
+  'NIFTY_INFRA',
+];
 
 interface EarningsWatchData {
   as_of: string;
@@ -33,6 +47,17 @@ function EarningsWatch() {
     { refetchInterval: 300000 }
   );
 
+  // Filter to canonical sectors only - must be called before early returns
+  const canonicalNext30d = useMemo(() => {
+    if (!data?.next_30d) return [];
+    return data.next_30d.filter(s => CANONICAL_SECTORS.includes(s.sector_id));
+  }, [data?.next_30d]);
+
+  const canonicalRevisionHeatmap = useMemo(() => {
+    if (!data?.revision_heatmap) return [];
+    return data.revision_heatmap.filter(s => CANONICAL_SECTORS.includes(s.sector_id));
+  }, [data?.revision_heatmap]);
+
   if (isLoading) {
     return (
       <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
@@ -52,14 +77,14 @@ function EarningsWatch() {
   }
 
   // Filter sectors with upcoming results
-  const upcomingSectors = data.next_30d.filter(s => s.results_count > 0);
+  const upcomingSectors = canonicalNext30d.filter(s => s.results_count > 0);
   const upcomingChartData = upcomingSectors.map(s => ({
     name: s.name.replace('Nifty ', ''),
     count: s.results_count,
   }));
 
   // Revision heatmap data
-  const revisionData = data.revision_heatmap
+  const revisionData = canonicalRevisionHeatmap
     .filter(s => s.total_revisions > 0)
     .map(s => ({
       name: s.name.replace('Nifty ', ''),
@@ -134,7 +159,7 @@ function EarningsWatch() {
               </ResponsiveContainer>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
-              {data.revision_heatmap
+              {canonicalRevisionHeatmap
                 .filter(s => s.total_revisions > 0)
                 .map((sector) => {
                   const net = (sector.upgrades_pct_60d - sector.downgrades_pct_60d) * 100;

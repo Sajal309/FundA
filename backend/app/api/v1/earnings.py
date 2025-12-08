@@ -20,12 +20,13 @@ def get_earnings_watch(
         Dictionary with next_30d earnings count and revision_heatmap
     """
     from app.api.v1.sectors import SECTOR_NAMES
+    from app.utils.sectors import get_canonical_sector_ids
     
     today = date.today()
     next_30d = today + timedelta(days=30)
     
-    # Get all sectors
-    sectors = crud.get_all_sectors(db)
+    # Only use canonical sectors
+    sectors = get_canonical_sector_ids()
     
     # Get upcoming earnings (next 30 days)
     upcoming_earnings = db.query(models.EarningsEvent).filter(

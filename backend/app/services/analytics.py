@@ -10,12 +10,88 @@ from app.utils import logger
 from app.utils.formatting import round_to_2_decimal, round_to_int, safe_divide
 
 
+def get_top_correlations(
+    db: Session,
+    from_date: Optional[date] = None,
+    to_date: Optional[date] = None,
+    lookback_days: int = 30,
+    top_n: int = 5
+) -> Dict[str, List[Dict[str, any]]]:
+    """
+    Get top positive and negative correlations between sectors.
+    
+    Args:
+        db: Database session
+        from_date: Start date
+        to_date: End date
+        lookback_days: Number of days to look back
+        top_n: Number of top correlations to return
+        
+    Returns:
+        Dictionary with 'top_positive' and 'top_negative' lists
+    """
+    from app.utils.sectors import get_canonical_sector_ids
+    from app.api.v1.sectors import SECTOR_NAMES
+    
+    # Get correlations for canonical sectors only
+    canonical_sectors = get_canonical_sector_ids()
+    correlations = calculate_sector_correlations(db, from_date, to_date, lookback_days)
+    
+    # Filter to canonical sectors and build pairs
+    pairs = []
+    seen_pairs = set()
+    
+    for key, corr_value in correlations.items():
+        # Try to match canonical sectors in the key
+        # Key format is typically "SECTOR1_SECTOR2"
+        for sector1 in canonical_sectors:
+            if key.startswith(sector1 + '_'):
+                sector2 = key[len(sector1) + 1:]
+                if sector2 in canonical_sectors and sector1 != sector2:
+                    pair_key = tuple(sorted([sector1, sector2]))
+                    if pair_key not in seen_pairs:
+                        seen_pairs.add(pair_key)
+                        pairs.append({
+                            'a': sector1,
+                            'b': sector2,
+                            'corr': round_to_2_decimal(corr_value) or 0.0
+                        })
+                        break
+            elif key.endswith('_' + sector1):
+                sector2 = key[:-len(sector1) - 1]
+                if sector2 in canonical_sectors and sector1 != sector2:
+                    pair_key = tuple(sorted([sector2, sector1]))
+                    if pair_key not in seen_pairs:
+                        seen_pairs.add(pair_key)
+                        pairs.append({
+                            'a': sector2,
+                            'b': sector1,
+                            'corr': round_to_2_decimal(corr_value) or 0.0
+                        })
+                        break
+    
+    # Sort by correlation value
+    pairs.sort(key=lambda x: x['corr'], reverse=True)
+    
+    # Get top positive (excluding self-correlations of 1.0)
+    top_positive = [p for p in pairs if p['corr'] > 0][:top_n]
+    
+    # Get top negative
+    pairs.sort(key=lambda x: x['corr'])
+    top_negative = [p for p in pairs if p['corr'] < 0][:top_n]
+    
+    return {
+        'top_positive': top_positive,
+        'top_negative': top_negative
+    }
+
+
 def calculate_sector_correlations(
     db: Session,
     from_date: Optional[date] = None,
     to_date: Optional[date] = None,
     lookback_days: int = 30
-) -> Dict[str, Dict[str, float]]:
+) -> Dict[str, float]:
     """
     Calculate correlation matrix between sectors based on returns.
     
@@ -163,14 +239,24 @@ def get_sector_comparison(
     """
     comparison = {}
     
+    # Get Nifty 50 features for relative comparison
+    nifty_features = crud.get_latest_sector_features(db, "NIFTY_50")
+    nifty_ret_3m = nifty_features.ret_3m if nifty_features and nifty_features.ret_3m else 0
+    
     for sector_id in sector_ids:
         if metric == "returns":
             features = crud.get_latest_sector_features(db, sector_id)
             if features:
+                ret_1m = features.ret_1m or 0
+                ret_3m = features.ret_3m or 0
+                ret_6m = features.ret_6m or 0
+                rel_3m_vs_nifty = features.rel_3m_vs_nifty if features.rel_3m_vs_nifty is not None else (ret_3m - nifty_ret_3m)
+                
                 comparison[sector_id] = [
-                    features.ret_1d or 0,
-                    features.ret_5d or 0,
-                    features.ret_1m or 0,
+                    ret_1m,
+                    ret_3m,
+                    ret_6m,
+                    rel_3m_vs_nifty,
                 ]
         elif metric == "sentiment":
             sentiment = crud.get_sector_sentiment_daily(db, sector_id)
@@ -685,6 +771,7 @@ def get_latest_news_headlines(
 ) -> List[Dict[str, any]]:
     """
     Get latest news headlines.
+    Only returns finance/market/sector-related headlines.
     
     Args:
         db: Database session
@@ -692,30 +779,57 @@ def get_latest_news_headlines(
         limit: Number of headlines to return
         
     Returns:
-        List of news headlines
+        List of news headlines with sector_tags and sentiment_label
     """
+    from app.utils.sectors import get_canonical_sector_ids
+    
     query = db.query(models.NewsHeadline).order_by(models.NewsHeadline.date.desc())
+    
+    # Filter to headlines that have sector tags (market/finance related)
+    # or have sentiment scores (likely market news)
+    canonical_sectors = get_canonical_sector_ids()
     
     if sector_id:
         # Filter by sector tags (JSONB contains)
         # Use Python-side filtering since JSONB LIKE doesn't work well
-        all_headlines = query.limit(limit * 3).all()  # Get more to filter
+        all_headlines = query.limit(limit * 5).all()  # Get more to filter
         headlines = [
             h for h in all_headlines
             if h.sector_tags and sector_id in h.sector_tags
         ][:limit]
     else:
-        headlines = query.limit(limit).all()
+        # Filter to headlines with sector tags (market/finance related)
+        all_headlines = query.limit(limit * 3).all()
+        headlines = [
+            h for h in all_headlines
+            if h.sector_tags and any(tag in canonical_sectors for tag in (h.sector_tags or []))
+        ][:limit]
     
-    return [
-        {
+    # Format headlines with sector_tags and sentiment_label
+    result = []
+    for h in headlines:
+        # Determine sentiment label
+        sentiment_label = "Neutral"
+        if h.sentiment_score is not None:
+            if h.sentiment_score > 0.1:
+                sentiment_label = "Positive"
+            elif h.sentiment_score < -0.1:
+                sentiment_label = "Negative"
+        
+        # Filter sector_tags to canonical sectors only
+        sector_tags = []
+        if h.sector_tags:
+            sector_tags = [tag for tag in h.sector_tags if tag in canonical_sectors]
+        
+        result.append({
             "headline": h.headline,
             "source": h.source,
             "published_at": h.date.isoformat() if h.date else None,
-            "sentiment_score": float(h.sentiment_score) if h.sentiment_score is not None else None,
-            "sector_tags": h.sector_tags if h.sector_tags else [],
             "url": h.url,
-        }
-        for h in headlines
-    ]
+            "sector_tags": sector_tags,
+            "sentiment_score": float(h.sentiment_score) if h.sentiment_score is not None else None,
+            "sentiment_label": sentiment_label,
+        })
+    
+    return result
 

@@ -86,6 +86,7 @@ export interface QuarterOutlookSector {
   sector_id: string;
   name: string;
   quarter_score: number;
+  label: string;  // "Strong", "Neutral", or "Weak"
   forecast_3m_label: string;
   expected_return_pct: number;
 }
@@ -197,6 +198,7 @@ export interface NewsHeadline {
   sentiment_score: number | null;
   sector_tags: string[];
   url: string | null;
+  sentiment_label?: string;
 }
 
 export const api = {
@@ -252,8 +254,19 @@ export const api = {
   },
 
   getSectorCorrelations: async (lookbackDays: number = 30): Promise<{ correlations: Record<string, number> }> => {
-    const response = await client.get('/api/v1/analytics/correlations', {
+    const response = await client.get(`/api/v1/analytics/correlations`, {
       params: { lookback_days: lookbackDays },
+    });
+    return response.data;
+  },
+
+  getTopCorrelations: async (lookbackDays: number = 30, topN: number = 5): Promise<{
+    as_of: string;
+    top_positive: Array<{ a: string; b: string; corr: number }>;
+    top_negative: Array<{ a: string; b: string; corr: number }>;
+  }> => {
+    const response = await client.get(`/api/v1/sectors/top-correlations`, {
+      params: { lookback_days: lookbackDays, top_n: topN },
     });
     return response.data;
   },
@@ -398,6 +411,61 @@ export const api = {
   }> => {
     const response = await client.get('/api/v1/sector-rotation/vwap', {
       params: { level, date },
+    });
+    return response.data;
+  },
+
+  // Stock Screener APIs
+  getSectorScreener: async (
+    sector: string,
+    limit: number = 100
+  ): Promise<{
+    sector: string;
+    label: string;
+    columns: Array<{ field: string; label: string; tooltip?: string }>;
+    rows: Array<Record<string, any>>;
+    count: number;
+    primarySort: { field: string; direction: string };
+    secondarySort?: { field: string; direction: string };
+  }> => {
+    const response = await client.get('/api/v1/sector-screener', {
+      params: { sector, limit },
+    });
+    return response.data;
+  },
+
+  listSectorScreeners: async (): Promise<{
+    screeners: Array<{ key: string; label: string; filterQuery: string }>;
+    count: number;
+  }> => {
+    const response = await client.get('/api/v1/sector-screener/list');
+    return response.data;
+  },
+
+  exportSectorScreener: async (sector: string, limit: number = 100): Promise<Blob> => {
+    const response = await client.get('/api/v1/sector-screener/export', {
+      params: { sector, limit },
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+
+  compareSectorScreeners: async (
+    sectors: string[],
+    limit: number = 50
+  ): Promise<{
+    as_of: string;
+    sectors: Record<string, {
+      label: string;
+      count: number;
+      top_5: Array<Record<string, any>>;
+      primary_sort_field: string;
+      error?: string;
+    }>;
+    count: number;
+  }> => {
+    const response = await client.get('/api/v1/sector-screener/compare', {
+      params: { sectors: sectors.join(','), limit },
     });
     return response.data;
   },

@@ -31,12 +31,12 @@ function QuarterOutlookRanking({ onSectorClick }: QuarterOutlookRankingProps) {
     );
   }
 
-  const getQuarterScoreLabel = (score: number): string => {
+  const getQuarterScoreLabel = (score: number, label?: string): string => {
+    // Use label from API if available, otherwise compute from score
+    if (label) return label;
     if (score >= 1.5) return 'Strong';
-    if (score >= 0.5) return 'Moderate';
     if (score >= -0.5) return 'Neutral';
-    if (score >= -1.5) return 'Weak';
-    return 'Very Weak';
+    return 'Weak';
   };
 
   const getQuarterScoreColor = (score: number): string => {
@@ -104,7 +104,7 @@ function QuarterOutlookRanking({ onSectorClick }: QuarterOutlookRankingProps) {
               <div className="ml-4">
                 <div className={`text-sm font-medium px-2 py-1 rounded`}
                   style={{ backgroundColor: getQuarterScoreColor(sector.quarter_score) + '20', color: getQuarterScoreColor(sector.quarter_score) }}>
-                  {getQuarterScoreLabel(sector.quarter_score)}
+                  {sector.label || getQuarterScoreLabel(sector.quarter_score)}
                 </div>
               </div>
             </div>

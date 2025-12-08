@@ -58,33 +58,49 @@ function NewsFeed({ sectorId, limit = 10 }: NewsFeedProps) {
     return 'Neutral';
   };
 
+  const getSentimentBadgeColor = (label?: string) => {
+    if (!label) return 'bg-dark-700 text-dark-400';
+    if (label === 'Positive') return 'bg-green-900/30 text-green-400';
+    if (label === 'Negative') return 'bg-red-900/30 text-red-400';
+    return 'bg-yellow-900/30 text-yellow-400';
+  };
+
   return (
     <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
-      <h3 className="text-lg font-semibold mb-4 text-dark-100">
-        Latest News {sectorId && `(${sectorId.replace('NIFTY_', '')})`}
-      </h3>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-dark-100">
+          Latest News {sectorId && `(${sectorId.replace('NIFTY_', '')})`}
+        </h3>
+      </div>
       <div className="space-y-4 max-h-96 overflow-y-auto">
         {data.headlines.map((headline, idx) => (
           <div key={idx} className="border-b border-dark-700 pb-4 last:border-b-0">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <h4 className="font-medium text-dark-100 mb-1">{headline.headline}</h4>
-                <div className="flex items-center gap-3 text-xs text-dark-400">
+                <h4 className="font-medium text-dark-100 mb-2">{headline.headline}</h4>
+                <div className="flex items-center gap-3 text-xs text-dark-400 flex-wrap">
                   <span>{headline.source}</span>
                   {headline.published_at && (
                     <span>{new Date(headline.published_at).toLocaleDateString()}</span>
                   )}
                   {headline.sector_tags && headline.sector_tags.length > 0 && (
-                    <span className="text-blue-400">
-                      {headline.sector_tags.map(t => t.replace('NIFTY_', '')).join(', ')}
-                    </span>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {headline.sector_tags.map((tag, tagIdx) => (
+                        <span
+                          key={tagIdx}
+                          className="px-2 py-0.5 rounded bg-blue-900/30 text-blue-400 text-xs"
+                        >
+                          {tag.replace('NIFTY_', '')}
+                        </span>
+                      ))}
+                    </div>
                   )}
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-1">
-                {headline.sentiment_score !== null && (
-                  <div className={`text-sm font-medium ${getSentimentColor(headline.sentiment_score)}`}>
-                    {getSentimentLabel(headline.sentiment_score)}
+              <div className="flex flex-col items-end gap-2">
+                {headline.sentiment_label && (
+                  <div className={`text-xs font-medium px-2 py-1 rounded ${getSentimentBadgeColor(headline.sentiment_label)}`}>
+                    {headline.sentiment_label}
                   </div>
                 )}
                 {headline.url && (

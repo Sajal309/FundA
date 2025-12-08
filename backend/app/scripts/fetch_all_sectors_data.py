@@ -10,6 +10,7 @@ Usage:
 """
 import argparse
 import sys
+import time
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Optional
@@ -21,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from app.db.database import SessionLocal
 from app.db import crud, schemas
 from app.api.v1.sectors import SECTOR_NAMES
-from app.services.fetch_nse import NSE_INDEX_SYMBOLS
+from app.services.fetch_nse import NSE_INDEX_SYMBOLS, fetch_nse_index_history, get_nse_session
 from app.services.features import compute_features_for_all_sectors
 from app.services.forecasts import generate_forecasts_for_all_sectors
 from app.utils import logger
@@ -30,11 +31,12 @@ from app.utils import logger
 # Comprehensive yfinance symbol mapping for NSE indices
 # Note: Many NSE indices are not available in yfinance
 # Using verified symbols that work with yfinance
+# Trying multiple symbol formats for better coverage
 YFINANCE_SYMBOL_MAP = {
     # Broad Market - Verified
     'NIFTY 50': '^NSEI',
     'NIFTY BANK': '^NSEBANK',
-    'NIFTY NEXT 50': '^NSENEXT50',
+    'NIFTY NEXT 50': '^NSENEXT50',  # May not work, try alternatives below
     
     # Sectoral Indices - Using CNX prefix (verified)
     'NIFTY IT': '^CNXIT',
@@ -55,12 +57,12 @@ YFINANCE_SYMBOL_MAP = {
     'NIFTY SERVICES': '^CNXSERVICES',
     'NIFTY COMMODITIES': '^CNXCOMMODITIES',
     
-    # Broad Market - May not be available
+    # Broad Market - Alternative symbols to try
     'NIFTY 100': '^CNX100',
     'NIFTY 200': '^CNX200',
-    'NIFTY 500': '^CNX500',
+    'NIFTY 500': '^CNX500',  # May not work
     
-    # Midcap/Smallcap - May not be available
+    # Midcap/Smallcap - Alternative symbols
     'NIFTY MIDCAP 50': '^CNXMID',
     'NIFTY MIDCAP 100': '^CNXMID100',
     'NIFTY MIDCAP 150': '^CNXMID150',
@@ -68,7 +70,7 @@ YFINANCE_SYMBOL_MAP = {
     'NIFTY SMALLCAP 100': '^CNXSC100',
     'NIFTY SMALLCAP 250': '^CNXSC250',
     
-    # Thematic - May not be available
+    # Thematic - Alternative symbols
     'NIFTY GROWTH SECTORS 15': '^CNXGROWTH',
     'NIFTY DIVIDEND OPPORTUNITIES 50': '^CNXDIVIDEND',
     'NIFTY QUALITY 30': '^CNXQUALITY',
@@ -77,9 +79,28 @@ YFINANCE_SYMBOL_MAP = {
     'NIFTY HIGH BETA 50': '^CNXHIGHBETA',
 }
 
+# Alternative symbol mappings for indexes that don't work with primary mapping
+YFINANCE_ALTERNATIVE_SYMBOLS = {
+    'NIFTY NEXT 50': ['^NSENEXT50', '^NSEJUNIOR', '^CNXNEXT50'],
+    'NIFTY 500': ['^CNX500', '^NSE500'],
+    'NIFTY MIDCAP 50': ['^CNXMID', '^NSEMIDCAP50', '^CNXMIDCAP50'],
+    'NIFTY MIDCAP 100': ['^CNXMID100', '^NSEMIDCAP100'],
+    'NIFTY MIDCAP 150': ['^CNXMID150', '^NSEMIDCAP150'],
+    'NIFTY SMALLCAP 50': ['^CNXSC', '^NSESMALLCAP50'],
+    'NIFTY SMALLCAP 100': ['^CNXSC100', '^NSESMALLCAP100'],
+    'NIFTY SMALLCAP 250': ['^CNXSC250', '^NSESMALLCAP250'],
+    'NIFTY PSU BANK': ['^CNXPSU', '^NSETPSU'],
+    'NIFTY PRIVATE BANK': ['^CNXPVT', '^NSETPRIVATE'],
+    'NIFTY HEALTHCARE': ['^CNXHEALTH', '^NSETHEALTH'],
+    'NIFTY CONSUMER DURABLES': ['^CNXCONSUMER', '^NSETCONSUMER'],
+    'NIFTY OIL & GAS': ['^CNXOILGAS', '^NSETOILGAS'],
+    'NIFTY SERVICES': ['^CNXSERVICES', '^NSETSERVICES'],
+    'NIFTY COMMODITIES': ['^CNXCOMMODITIES', '^NSETCOMMODITIES'],
+}
+
 
 def get_yfinance_symbol(sector_id: str) -> Optional[str]:
-    """Get yfinance symbol for a sector."""
+    """Get yfinance symbol for a sector, trying multiple alternatives."""
     nse_symbol = NSE_INDEX_SYMBOLS.get(sector_id)
     if not nse_symbol:
         return None
@@ -88,6 +109,12 @@ def get_yfinance_symbol(sector_id: str) -> Optional[str]:
     yf_symbol = YFINANCE_SYMBOL_MAP.get(nse_symbol)
     if yf_symbol:
         return yf_symbol
+    
+    # Try alternative symbols if available
+    alternatives = YFINANCE_ALTERNATIVE_SYMBOLS.get(nse_symbol, [])
+    if alternatives:
+        # Return first alternative (will try others in fetch function if this fails)
+        return alternatives[0]
     
     # Try common NSE index formats
     # Many indices use ^CNX prefix instead of ^NSE
@@ -106,35 +133,132 @@ def get_yfinance_symbol(sector_id: str) -> Optional[str]:
     return None
 
 
+def fetch_and_store_sector_data_from_nse(
+    db,
+    sector_id: str,
+    days: int = 365
+) -> int:
+    """Fetch data for a sector using NSE direct API and store in database."""
+    nse_symbol = NSE_INDEX_SYMBOLS.get(sector_id)
+    if not nse_symbol:
+        logger.warning(f"No NSE symbol found for {sector_id}")
+        return 0
+    
+    logger.info(f"Fetching data from NSE for {sector_id} ({nse_symbol})")
+    
+    try:
+        end_date = date.today()
+        start_date = end_date - timedelta(days=days)
+        
+        # Fetch from NSE
+        df = fetch_nse_index_history(nse_symbol, start_date, end_date)
+        
+        if df.empty:
+            logger.warning(f"No data returned from NSE for {nse_symbol} ({sector_id})")
+            return 0
+        
+        logger.info(f"Fetched {len(df)} records from NSE for {sector_id}")
+        
+        # Get existing dates to avoid duplicates
+        existing_ts = crud.get_sector_timeseries(db, sector_id, limit=10000)
+        existing_dates = {ts.ts.date() for ts in existing_ts}
+        
+        count = 0
+        for _, row in df.iterrows():
+            ts_date = row['Date'].date() if hasattr(row['Date'], 'date') else pd.Timestamp(row['Date']).date()
+            
+            if ts_date in existing_dates:
+                continue
+            
+            try:
+                ts_data = schemas.SectorTimeSeriesCreate(
+                    sector_id=sector_id,
+                    ts=pd.Timestamp(row['Date']),
+                    open=float(row['Open']),
+                    high=float(row['High']),
+                    low=float(row['Low']),
+                    close=float(row['Close']),
+                    volume=int(row['Volume']) if pd.notna(row['Volume']) else 0
+                )
+                crud.create_sector_time_series(db, ts_data)
+                count += 1
+                
+                if count % 50 == 0:
+                    db.commit()
+                    logger.debug(f"  Stored {count} records for {sector_id}...")
+            except Exception as e:
+                logger.warning(f"Failed to store record for {sector_id} on {ts_date}: {e}")
+                continue
+        
+        db.commit()
+        logger.info(f"✅ Stored {count} new records from NSE for {sector_id} (total: {len(df)} records)")
+        return count
+        
+    except Exception as e:
+        logger.error(f"Error fetching data from NSE for {sector_id}: {e}")
+        return 0
+
+
 def fetch_and_store_sector_data(
     db,
     sector_id: str,
     days: int = 365
 ) -> int:
-    """Fetch data for a sector using yfinance and store in database."""
+    """Fetch data for a sector using yfinance (with NSE fallback) and store in database."""
     try:
         import yfinance as yf
     except ImportError:
         logger.error("yfinance not installed. Install with: pip install yfinance")
-        return 0
+        # Try NSE as fallback
+        return fetch_and_store_sector_data_from_nse(db, sector_id, days)
     
-    yf_symbol = get_yfinance_symbol(sector_id)
-    if not yf_symbol:
+    # Get primary symbol and alternatives
+    nse_symbol = NSE_INDEX_SYMBOLS.get(sector_id)
+    primary_symbol = get_yfinance_symbol(sector_id)
+    alternative_symbols = YFINANCE_ALTERNATIVE_SYMBOLS.get(nse_symbol, []) if nse_symbol else []
+    
+    # Combine all symbols to try
+    symbols_to_try = [primary_symbol] if primary_symbol else []
+    if alternative_symbols and primary_symbol not in alternative_symbols:
+        symbols_to_try.extend(alternative_symbols)
+    
+    if not symbols_to_try:
         logger.warning(f"No yfinance symbol found for {sector_id}")
         return 0
     
-    logger.info(f"Fetching data for {sector_id} using yfinance symbol: {yf_symbol}")
+    # Try each symbol until one works
+    hist = None
+    successful_symbol = None
+    for yf_symbol in symbols_to_try:
+        if not yf_symbol:
+            continue
+        logger.info(f"Trying yfinance symbol: {yf_symbol} for {sector_id}")
+        try:
+            ticker = yf.Ticker(yf_symbol)
+            end_date = date.today()
+            start_date = end_date - timedelta(days=days)
+            
+            hist = ticker.history(start=start_date, end=end_date)
+            
+            if not hist.empty:
+                successful_symbol = yf_symbol
+                break
+        except Exception as e:
+            logger.debug(f"Symbol {yf_symbol} failed: {e}")
+            continue
+    
+    if hist is None or hist.empty:
+        logger.warning(f"No data returned from yfinance for {sector_id} (tried: {', '.join(symbols_to_try)})")
+        # Try NSE as fallback
+        logger.info(f"Trying NSE API as fallback for {sector_id}...")
+        nse_count = fetch_and_store_sector_data_from_nse(db, sector_id, days)
+        if nse_count > 0:
+            return nse_count
+        return 0
+    
+    logger.info(f"✅ Successfully fetched data from yfinance for {sector_id} using symbol: {successful_symbol}")
     
     try:
-        ticker = yf.Ticker(yf_symbol)
-        end_date = date.today()
-        start_date = end_date - timedelta(days=days)
-        
-        hist = ticker.history(start=start_date, end=end_date)
-        
-        if hist.empty:
-            logger.warning(f"No data returned for {yf_symbol} ({sector_id})")
-            return 0
         
         logger.info(f"Fetched {len(hist)} records for {sector_id}")
         
@@ -214,10 +338,21 @@ def fetch_all_sectors_data(
                     logger.info(f"  ⏭️  {sector_id} already has data, skipping")
                     success_count += 1
                 else:
-                    failed_sectors.append(sector_id)
+                    # Try NSE as fallback
+                    logger.info(f"  🔄 Trying NSE API for {sector_id}...")
+                    nse_count = fetch_and_store_sector_data_from_nse(db, sector_id, days)
+                    if nse_count > 0:
+                        success_count += 1
+                        total_records += nse_count
+                    else:
+                        failed_sectors.append(sector_id)
         except Exception as e:
             logger.error(f"  ❌ Failed to fetch {sector_id}: {e}")
             failed_sectors.append(sector_id)
+        
+        # Add delay to avoid rate limiting (especially for NSE)
+        if idx < len(sectors_to_fetch):
+            time.sleep(0.5)  # 500ms delay between requests
     
     result = {
         "success": success_count,

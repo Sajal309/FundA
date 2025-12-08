@@ -1,0 +1,24 @@
+# Canonical Sector List for SectorView
+# Only Nifty sector indices - used for all sector-level analytics
+# Unless explicitly labelled otherwise (e.g., "Broad Market" or "Thematic")
+
+sectors:
+  - id: NIFTY_AUTO
+    name: Nifty Auto
+  - id: NIFTY_BANK
+    name: Nifty Bank
+  - id: NIFTY_FMCG
+    name: Nifty FMCG
+  - id: NIFTY_IT
+    name: Nifty IT
+  - id: NIFTY_PHARMA
+    name: Nifty Pharma
+  - id: NIFTY_METAL
+    name: Nifty Metal
+  - id: NIFTY_REALTY
+    name: Nifty Realty
+  - id: NIFTY_ENERGY
+    name: Nifty Energy
+  - id: NIFTY_INFRA
+    name: Nifty Infrastructure
+

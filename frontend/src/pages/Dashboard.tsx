@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQuery } from 'react-query';
 import { Link } from 'react-router-dom';
 import { api, SectorSummary, ForecastResponse } from '../api/client';
+import Navigation from '../components/Navigation';
 import SectorTile from '../components/SectorTile';
 import SectorDetail from '../components/SectorDetail';
 import CorrelationMatrix from '../components/CorrelationMatrix';
@@ -140,9 +141,15 @@ function Dashboard() {
               <h1 className="text-2xl font-bold text-dark-100">SectorView</h1>
               <Link
                 to="/sector-rotation"
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                className="px-4 py-2 bg-dark-700 text-dark-300 rounded-md hover:bg-dark-600 transition-colors"
               >
                 Sector Rotation
+              </Link>
+              <Link
+                to="/stock-screener"
+                className="px-4 py-2 bg-dark-700 text-dark-300 rounded-md hover:bg-dark-600 transition-colors"
+              >
+                Stock Screener
               </Link>
             </div>
             <div className="flex items-center gap-4">

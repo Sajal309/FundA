@@ -38,14 +38,28 @@ function SectorRotationPage() {
       <header className="bg-dark-800 shadow-sm border-b border-dark-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
+              <Link to="/" className="text-2xl font-bold text-dark-100 hover:text-blue-400 transition-colors">
+                SectorView
+              </Link>
               <Link
                 to="/"
-                className="text-dark-400 hover:text-dark-100 transition-colors"
+                className="px-4 py-2 bg-dark-700 text-dark-300 rounded-md hover:bg-dark-600 transition-colors"
               >
-                ← Back
+                Dashboard
               </Link>
-              <h1 className="text-2xl font-bold text-dark-100">Sector Rotation</h1>
+              <Link
+                to="/sector-rotation"
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Sector Rotation
+              </Link>
+              <Link
+                to="/stock-screener"
+                className="px-4 py-2 bg-dark-700 text-dark-300 rounded-md hover:bg-dark-600 transition-colors"
+              >
+                Stock Screener
+              </Link>
             </div>
             <div className="flex items-center gap-4">
               {availableDates && availableDates.length > 0 && (

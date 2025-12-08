@@ -1,6 +1,20 @@
+import { useMemo } from 'react';
 import { useQuery } from 'react-query';
 import { api } from '../api/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+
+// Canonical sectors list
+const CANONICAL_SECTORS = [
+  'NIFTY_AUTO',
+  'NIFTY_BANK',
+  'NIFTY_FMCG',
+  'NIFTY_IT',
+  'NIFTY_PHARMA',
+  'NIFTY_METAL',
+  'NIFTY_REALTY',
+  'NIFTY_ENERGY',
+  'NIFTY_INFRA',
+];
 
 interface BreadthSector {
   sector_id: string;
@@ -31,6 +45,12 @@ function BreadthLeadership() {
     { refetchInterval: 300000 }
   );
 
+  // Filter to canonical sectors only - must be called before early returns
+  const canonicalSectors = useMemo(() => {
+    if (!data?.sectors) return [];
+    return data.sectors.filter(s => CANONICAL_SECTORS.includes(s.sector_id));
+  }, [data?.sectors]);
+
   if (isLoading) {
     return (
       <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
@@ -49,7 +69,7 @@ function BreadthLeadership() {
     );
   }
 
-  const chartData = data.sectors.map((sector) => ({
+  const chartData = canonicalSectors.map((sector) => ({
     name: sector.name.replace('Nifty ', ''),
     above_50dma: sector.above_50dma_pct * 100,
     above_200dma: (sector.above_200dma_pct || 0) * 100,
@@ -91,7 +111,7 @@ function BreadthLeadership() {
             </tr>
           </thead>
           <tbody className="bg-dark-800 divide-y divide-dark-700">
-            {data.sectors.map((sector) => {
+            {canonicalSectors.map((sector) => {
               const breadth50 = sector.above_50dma_pct;
               const breadth200 = sector.above_200dma_pct || 0;
               const highs = sector.highs_3m_pct;
