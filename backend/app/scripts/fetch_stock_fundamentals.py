@@ -94,6 +94,7 @@ def create_mock_fundamentals(ticker: str, sector_id: Optional[str]) -> Dict[str,
     # Base values by sector type
     if sector_id and 'BANK' in sector_id:
         return {
+            'market_cap': random.randint(50000, 500000) * 10000000,  # In crores (5000-50000 Cr)
             'roa': round(random.uniform(1.0, 2.5), 2),
             'net_interest_margin': round(random.uniform(3.0, 5.0), 2),
             'gross_npa': round(random.uniform(0.5, 3.0), 2),
@@ -103,28 +104,61 @@ def create_mock_fundamentals(ticker: str, sector_id: Optional[str]) -> Dict[str,
             'capital_adequacy': round(random.uniform(15.0, 20.0), 2),
             'profit_growth_5y': round(random.uniform(12.0, 25.0), 2),
             'roe': round(random.uniform(12.0, 20.0), 2),
+            'roe_3y': round(random.uniform(12.0, 20.0), 2),
+            'roe_5y': round(random.uniform(12.0, 20.0), 2),
+            'pe': round(random.uniform(10.0, 25.0), 2),
+            'dividend_yield': round(random.uniform(0.5, 2.5), 2),
+            'qtr_profit_var_pct': round(random.uniform(-10.0, 30.0), 2),
+            'qtr_sales_var_pct': round(random.uniform(-5.0, 25.0), 2),
+            'pledged_percent': round(random.uniform(0.0, 5.0), 2),
+            'promoter_holding': round(random.uniform(20.0, 60.0), 2),
+            'public_holding': round(random.uniform(40.0, 80.0), 2),
+            'sales': random.randint(5000, 50000) * 10000000,  # In crores
         }
     elif sector_id and 'IT' in sector_id:
         return {
+            'market_cap': random.randint(100000, 1000000) * 10000000,  # In crores (10000-100000 Cr)
             'roe': round(random.uniform(18.0, 30.0), 2),
             'roce': round(random.uniform(20.0, 35.0), 2),
             'ebit_margin': round(random.uniform(18.0, 25.0), 2),
             'profit_growth_5y': round(random.uniform(12.0, 20.0), 2),
             'free_cash_flow': random.randint(1000, 10000) * 10000000,  # In crores
             'debt_to_equity': round(random.uniform(0.1, 0.3), 2),
+            'roe_3y': round(random.uniform(18.0, 30.0), 2),
+            'roe_5y': round(random.uniform(18.0, 30.0), 2),
+            'pe': round(random.uniform(20.0, 35.0), 2),
+            'dividend_yield': round(random.uniform(0.5, 2.0), 2),
+            'qtr_profit_var_pct': round(random.uniform(-5.0, 25.0), 2),
+            'qtr_sales_var_pct': round(random.uniform(-3.0, 20.0), 2),
+            'pledged_percent': round(random.uniform(0.0, 3.0), 2),
+            'promoter_holding': round(random.uniform(30.0, 70.0), 2),
+            'public_holding': round(random.uniform(30.0, 70.0), 2),
+            'sales': random.randint(5000, 50000) * 10000000,  # In crores
         }
     elif sector_id and 'PHARMA' in sector_id:
         return {
+            'market_cap': random.randint(20000, 200000) * 10000000,  # In crores
             'roce': round(random.uniform(15.0, 25.0), 2),
             'roe': round(random.uniform(15.0, 25.0), 2),
             'rnd_to_sales': round(random.uniform(5.0, 12.0), 2),
             'sales_growth_5y': round(random.uniform(10.0, 20.0), 2),
             'export_share': round(random.uniform(40.0, 70.0), 2),
             'debt_to_equity': round(random.uniform(0.2, 0.4), 2),
+            'roe_3y': round(random.uniform(15.0, 25.0), 2),
+            'roe_5y': round(random.uniform(15.0, 25.0), 2),
+            'pe': round(random.uniform(25.0, 40.0), 2),
+            'dividend_yield': round(random.uniform(0.5, 1.5), 2),
+            'qtr_profit_var_pct': round(random.uniform(-8.0, 20.0), 2),
+            'qtr_sales_var_pct': round(random.uniform(-5.0, 18.0), 2),
+            'pledged_percent': round(random.uniform(0.0, 8.0), 2),
+            'promoter_holding': round(random.uniform(25.0, 65.0), 2),
+            'public_holding': round(random.uniform(35.0, 75.0), 2),
+            'sales': random.randint(3000, 30000) * 10000000,  # In crores
         }
     else:
         # Generic manufacturing/services
         return {
+            'market_cap': random.randint(10000, 100000) * 10000000,  # In crores
             'roe': round(random.uniform(15.0, 25.0), 2),
             'roce': round(random.uniform(15.0, 25.0), 2),
             'operating_margin': round(random.uniform(12.0, 20.0), 2),
@@ -132,6 +166,16 @@ def create_mock_fundamentals(ticker: str, sector_id: Optional[str]) -> Dict[str,
             'profit_growth_5y': round(random.uniform(10.0, 20.0), 2),
             'debt_to_equity': round(random.uniform(0.3, 0.8), 2),
             'interest_coverage': round(random.uniform(3.0, 8.0), 2),
+            'roe_3y': round(random.uniform(15.0, 25.0), 2),
+            'roe_5y': round(random.uniform(15.0, 25.0), 2),
+            'pe': round(random.uniform(15.0, 30.0), 2),
+            'dividend_yield': round(random.uniform(0.5, 2.5), 2),
+            'qtr_profit_var_pct': round(random.uniform(-10.0, 30.0), 2),
+            'qtr_sales_var_pct': round(random.uniform(-5.0, 25.0), 2),
+            'pledged_percent': round(random.uniform(0.0, 10.0), 2),
+            'promoter_holding': round(random.uniform(20.0, 60.0), 2),
+            'public_holding': round(random.uniform(40.0, 80.0), 2),
+            'sales': random.randint(2000, 20000) * 10000000,  # In crores
         }
 
 

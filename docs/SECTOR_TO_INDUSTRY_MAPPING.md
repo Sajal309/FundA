@@ -176,7 +176,7 @@ docker compose exec backend python -m app.scripts.assign_industries_to_all_stock
 To populate industry data:
 
 ```bash
-docker compose exec backend python -m app.scripts.run_sector_rotation_etl --date YYYY-MM-DD
+docker compose exec backend python -m app.scripts.fetch_real_sector_rotation_data --skip-fetch --skip-indicators
 ```
 
 ## Benefits of 1:1 Mapping

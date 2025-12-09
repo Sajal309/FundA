@@ -58,10 +58,10 @@ The Sector Rotation feature has been fully implemented, providing comprehensive 
 ### Running ETL
 ```bash
 # Run aggregation for today
-docker compose exec backend python -m app.scripts.run_sector_rotation_etl
+docker compose exec backend python -m app.scripts.fetch_real_sector_rotation_data --skip-fetch --skip-indicators
 
 # Run for specific date
-docker compose exec backend python -m app.scripts.run_sector_rotation_etl --date 2024-12-06
+docker compose exec backend python -m app.scripts.fetch_real_sector_rotation_data --skip-fetch --skip-indicators
 ```
 
 ## Data Requirements
@@ -136,7 +136,7 @@ curl "http://localhost:8000/api/v1/sector-rotation/vwap?level=sector&date=2024-1
 - `app/services/sector_rotation.py` - Query services
 - `app/services/sector_rotation_etl.py` - ETL services
 - `app/api/v1/sector_rotation.py` - API endpoints
-- `app/scripts/run_sector_rotation_etl.py` - ETL runner script
+- ETL aggregation is handled by `app/services/sector_rotation_etl.py` via `fetch_real_sector_rotation_data.py`
 - `app/main.py` - Router registration
 
 **Frontend (7 files):**

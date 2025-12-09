@@ -59,7 +59,7 @@ The Industry Rotation feature has been fully implemented, providing comprehensiv
 docker compose exec backend python -m app.scripts.run_sector_rotation_etl
 
 # Run for a specific date
-docker compose exec backend python -m app.scripts.run_sector_rotation_etl --date 2025-12-05
+docker compose exec backend python -m app.scripts.fetch_real_sector_rotation_data --skip-fetch --skip-indicators
 ```
 
 ### Accessing Industry Data

@@ -94,6 +94,21 @@ FIELD_MAP = {
     "orderBookToSales": "order_book_to_sales",
     "orderBookVisibilityYears": "order_book_visibility_years",
     "arpuGrowth": "arpu_growth",
+    # Standardized fields
+    "cmp": "cmp",  # Will be fetched from StockTimeSeries
+    "pe": "pe",
+    "dividend_yield": "dividend_yield",
+    "qtr_profit_var_pct": "qtr_profit_var_pct",
+    "qtr_sales_var_pct": "qtr_sales_var_pct",
+    "roe_3y": "roe_3y",
+    "roe_5y": "roe_5y",
+    "pledged_percent": "pledged_percent",
+    "promoter_holding": "promoter_holding",
+    "public_holding": "public_holding",
+    "mcap_to_sales": "mcap_to_sales",  # Will be calculated
+    "percent_change_52w": "percent_change_52w",  # Will be calculated from StockTimeSeries
+    "market_cap": "market_cap",
+    "free_cash_flow": "free_cash_flow",
 }
 
 SECTOR_SCREENERS: Dict[str, SectorScreenerConfig] = {

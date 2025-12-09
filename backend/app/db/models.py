@@ -382,9 +382,14 @@ class StockFundamentals(Base):
     
     # Basic metrics
     market_cap = Column(Numeric(20, 2), nullable=True)  # Market cap in INR (crores)
+    sales = Column(Numeric(20, 2), nullable=True)  # Sales/Revenue (Rs. Cr.)
+    pe = Column(Numeric(8, 2), nullable=True)  # Price to Earnings ratio
+    dividend_yield = Column(Numeric(6, 2), nullable=True)  # Dividend Yield %
     
     # Profitability
     roe = Column(Numeric(6, 2), nullable=True)  # Return on Equity %
+    roe_3y = Column(Numeric(6, 2), nullable=True)  # ROE 3 Year Average %
+    roe_5y = Column(Numeric(6, 2), nullable=True)  # ROE 5 Year Average %
     roce = Column(Numeric(6, 2), nullable=True)  # Return on Capital Employed %
     roa = Column(Numeric(6, 2), nullable=True)  # Return on Assets % (for banks)
     
@@ -399,6 +404,8 @@ class StockFundamentals(Base):
     sales_growth_5y = Column(Numeric(6, 2), nullable=True)  # Sales CAGR 5 Years %
     profit_growth_5y = Column(Numeric(6, 2), nullable=True)  # Profit CAGR 5 Years %
     revenue_growth_5y = Column(Numeric(6, 2), nullable=True)  # Revenue CAGR 5 Years %
+    qtr_profit_var_pct = Column(Numeric(6, 2), nullable=True)  # Quarterly Profit Variation %
+    qtr_sales_var_pct = Column(Numeric(6, 2), nullable=True)  # Quarterly Sales Variation %
     
     # Leverage
     debt_to_equity = Column(Numeric(8, 2), nullable=True)  # Debt to Equity ratio
@@ -441,6 +448,11 @@ class StockFundamentals(Base):
     
     # Cash Flow
     free_cash_flow = Column(Numeric(20, 2), nullable=True)  # Free Cash Flow (Rs. Cr.)
+    
+    # Shareholding
+    pledged_percent = Column(Numeric(6, 2), nullable=True)  # Pledged Shares %
+    promoter_holding = Column(Numeric(6, 2), nullable=True)  # Promoter Holding %
+    public_holding = Column(Numeric(6, 2), nullable=True)  # Public Holding %
     
     __table_args__ = (
         UniqueConstraint("ticker", "date", name="uq_stock_fundamentals"),
@@ -510,8 +522,14 @@ class SectorMomentumScore(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     sector_id = Column(String, nullable=False, index=True)
-    momentum_score = Column(Float, nullable=False)  # Normalized score
-    momentum_rank = Column(Integer, nullable=True)  # Rank among all sectors
+    total_mcap = Column(Numeric(20, 2), nullable=False)
+    total_stocks = Column(Integer, nullable=False)
+    score_1m = Column(Float, nullable=True)  # 1-month momentum score
+    score_3m = Column(Float, nullable=True)  # 3-month momentum score
+    score_6m = Column(Float, nullable=True)  # 6-month momentum score
+    return_1m = Column(Float, nullable=True)  # 1-month return
+    return_3m = Column(Float, nullable=True)  # 3-month return
+    return_6m = Column(Float, nullable=True)  # 6-month return
     
     __table_args__ = (
         UniqueConstraint("sector_id", "date", name="uq_sector_momentum_scores"),
@@ -525,8 +543,14 @@ class IndustryMomentumScore(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     industry_id = Column(String, nullable=False, index=True)
-    momentum_score = Column(Float, nullable=False)  # Normalized score
-    momentum_rank = Column(Integer, nullable=True)  # Rank among all industries
+    total_mcap = Column(Numeric(20, 2), nullable=False)
+    total_stocks = Column(Integer, nullable=False)
+    score_1m = Column(Float, nullable=True)  # 1-month momentum score
+    score_3m = Column(Float, nullable=True)  # 3-month momentum score
+    score_6m = Column(Float, nullable=True)  # 6-month momentum score
+    return_1m = Column(Float, nullable=True)  # 1-month return
+    return_3m = Column(Float, nullable=True)  # 3-month return
+    return_6m = Column(Float, nullable=True)  # 6-month return
     
     __table_args__ = (
         UniqueConstraint("industry_id", "date", name="uq_industry_momentum_scores"),
@@ -540,9 +564,16 @@ class SectorDeliveryStats(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     sector_id = Column(String, nullable=False, index=True)
-    avg_delivery_pct = Column(Float, nullable=True)  # Average delivery % (0-1)
-    total_delivery_value = Column(Numeric(20, 2), nullable=True)  # Total delivery value
-    total_traded_value = Column(Numeric(20, 2), nullable=True)  # Total traded value
+    stocks_count = Column(Integer, nullable=False)
+    sector_mcap = Column(Numeric(20, 2), nullable=False)
+    sector_mcap_change_abs = Column(Numeric(20, 2), nullable=True)
+    sector_mcap_change_pct = Column(Float, nullable=True)
+    traded_value = Column(Numeric(20, 2), nullable=True)
+    traded_value_avg = Column(Numeric(20, 2), nullable=True)
+    traded_value_multiple = Column(Float, nullable=True)
+    delivery_value = Column(Numeric(20, 2), nullable=True)
+    delivery_value_avg = Column(Numeric(20, 2), nullable=True)
+    delivery_value_multiple = Column(Float, nullable=True)
     
     __table_args__ = (
         UniqueConstraint("sector_id", "date", name="uq_sector_delivery_stats"),
@@ -556,9 +587,16 @@ class IndustryDeliveryStats(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     industry_id = Column(String, nullable=False, index=True)
-    avg_delivery_pct = Column(Float, nullable=True)  # Average delivery % (0-1)
-    total_delivery_value = Column(Numeric(20, 2), nullable=True)  # Total delivery value
-    total_traded_value = Column(Numeric(20, 2), nullable=True)  # Total traded value
+    stocks_count = Column(Integer, nullable=False)
+    industry_mcap = Column(Numeric(20, 2), nullable=False)
+    industry_mcap_change_abs = Column(Numeric(20, 2), nullable=True)
+    industry_mcap_change_pct = Column(Float, nullable=True)
+    traded_value = Column(Numeric(20, 2), nullable=True)
+    traded_value_avg = Column(Numeric(20, 2), nullable=True)
+    traded_value_multiple = Column(Float, nullable=True)
+    delivery_value = Column(Numeric(20, 2), nullable=True)
+    delivery_value_avg = Column(Numeric(20, 2), nullable=True)
+    delivery_value_multiple = Column(Float, nullable=True)
     
     __table_args__ = (
         UniqueConstraint("industry_id", "date", name="uq_industry_delivery_stats"),
