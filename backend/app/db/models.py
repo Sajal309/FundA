@@ -610,8 +610,8 @@ class SectorVWAPSnapshot(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     sector_id = Column(String, nullable=False, index=True)
-    vwap = Column(Numeric(15, 2), nullable=True)  # Market-cap weighted VWAP
-    price_vs_vwap_pct = Column(Float, nullable=True)  # Current price vs VWAP %
+    total_mcap = Column(Numeric(15, 2), nullable=True)  # Total market cap
+    pct_mcap_price_above_vwap = Column(Float, nullable=True)  # % of mcap where price > VWAP
     
     __table_args__ = (
         UniqueConstraint("sector_id", "date", name="uq_sector_vwap_snapshots"),
@@ -625,8 +625,8 @@ class IndustryVWAPSnapshot(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     industry_id = Column(String, nullable=False, index=True)
-    vwap = Column(Numeric(15, 2), nullable=True)  # Market-cap weighted VWAP
-    price_vs_vwap_pct = Column(Float, nullable=True)  # Current price vs VWAP %
+    total_mcap = Column(Numeric(15, 2), nullable=True)  # Total market cap
+    pct_mcap_price_above_vwap = Column(Float, nullable=True)  # % of mcap where price > VWAP
     
     __table_args__ = (
         UniqueConstraint("industry_id", "date", name="uq_industry_vwap_snapshots"),
