@@ -3,10 +3,11 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from typing import Dict, Any, List, Optional
-from datetime import date
+from datetime import date, datetime
+from sqlalchemy import func
 import csv
 import io
-from app.db import database
+from app.db import database, models
 from app.config.sector_screeners import SECTOR_SCREENERS
 from app.services import sector_screener
 from app.utils import logger
@@ -41,6 +42,16 @@ def get_sector_screener(
         logger.error(f"Error screening stocks for {sector}: {e}")
         raise HTTPException(status_code=500, detail=f"Error screening stocks: {str(e)}")
     
+    # Get latest data timestamp
+    latest_fundamentals = db.query(func.max(models.StockFundamentals.date)).scalar()
+    latest_timeseries = db.query(func.max(models.StockTimeSeries.date)).scalar()
+    
+    last_updated = None
+    if latest_fundamentals:
+        last_updated = latest_fundamentals.isoformat()
+    elif latest_timeseries:
+        last_updated = latest_timeseries.isoformat()
+    
     # Format columns for response
     columns = [
         {
@@ -64,7 +75,12 @@ def get_sector_screener(
         "secondarySort": {
             "field": config.secondary_sort.field,
             "direction": config.secondary_sort.direction
-        } if config.secondary_sort else None
+        } if config.secondary_sort else None,
+        "metadata": {
+            "last_updated": last_updated,
+            "fetched_at": datetime.utcnow().isoformat(),
+            "is_live": False,  # Screener data is from database, not live
+        }
     }
 
 

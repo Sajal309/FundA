@@ -1,5 +1,6 @@
 import { useQuery } from 'react-query';
 import { api } from '../../api/client';
+import DataFreshness from '../DataFreshness';
 
 interface ScoresTabProps {
   level: 'sector' | 'industry';
@@ -52,12 +53,25 @@ function ScoresTab({ level, date }: ScoresTabProps) {
   return (
     <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-dark-100 mb-2">
-          Curious to see which {level === 'sector' ? 'sectors' : 'industries'} are in momentum across three different time horizons?
-        </h2>
-        <p className="text-sm text-dark-400">
-          Track how the money is moving from one {level === 'sector' ? 'Sector' : 'Industry'} to another
-        </p>
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <h2 className="text-xl font-semibold text-dark-100 mb-2">
+              Curious to see which {level === 'sector' ? 'sectors' : 'industries'} are in momentum across three different time horizons?
+            </h2>
+            <p className="text-sm text-dark-400">
+              Track how the money is moving from one {level === 'sector' ? 'Sector' : 'Industry'} to another
+            </p>
+          </div>
+          {data.metadata && (
+            <DataFreshness
+              lastUpdated={data.metadata.last_updated}
+              fetchedAt={data.metadata.fetched_at}
+              isLive={data.metadata.is_live}
+              source={`${level === 'sector' ? 'Sector' : 'Industry'} momentum`}
+              compact
+            />
+          )}
+        </div>
       </div>
 
       {/* Legend */}

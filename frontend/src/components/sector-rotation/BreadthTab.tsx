@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from 'react-query';
 import { api } from '../../api/client';
+import DataFreshness from '../DataFreshness';
 
 interface BreadthTabProps {
   level: 'sector' | 'industry';
@@ -51,12 +52,25 @@ function BreadthTab({ level, date }: BreadthTabProps) {
   return (
     <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-dark-100 mb-2">
-          Which {level === 'sector' ? 'Sector' : 'Industry'} is the right {level === 'sector' ? 'Sector' : 'Industry'} to invest now?
-        </h2>
-        <p className="text-sm text-dark-400">
-          Track how the money is moving from one {level === 'sector' ? 'Sector' : 'Industry'} to another
-        </p>
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <h2 className="text-xl font-semibold text-dark-100 mb-2">
+              Which {level === 'sector' ? 'Sector' : 'Industry'} is the right {level === 'sector' ? 'Sector' : 'Industry'} to invest now?
+            </h2>
+            <p className="text-sm text-dark-400">
+              Track how the money is moving from one {level === 'sector' ? 'Sector' : 'Industry'} to another
+            </p>
+          </div>
+          {data.metadata && (
+            <DataFreshness
+              lastUpdated={data.metadata.last_updated}
+              fetchedAt={data.metadata.fetched_at}
+              isLive={data.metadata.is_live}
+              source={`${level === 'sector' ? 'Sector' : 'Industry'} breadth`}
+              compact
+            />
+          )}
+        </div>
       </div>
 
       <div className="flex items-center justify-between mb-4">

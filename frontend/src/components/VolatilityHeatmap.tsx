@@ -20,11 +20,14 @@ interface VolatilityHeatmapProps {
 }
 
 function VolatilityHeatmap({ lookbackDays = 30 }: VolatilityHeatmapProps) {
-  const { data: sectors } = useQuery('sectors', api.getSectors, { refetchInterval: 300000 });
+  const { data: sectorsResponse } = useQuery('sectors', api.getSectors, { refetchInterval: 300000 });
+  
+  // Handle both array response and object response with metadata
+  const sectors = Array.isArray(sectorsResponse) ? sectorsResponse : (sectorsResponse?.sectors || []);
   
   // Filter to canonical sectors only
   const canonicalSectors = useMemo(() => {
-    if (!sectors) return [];
+    if (!sectors || !Array.isArray(sectors)) return [];
     return sectors.filter(s => CANONICAL_SECTORS.includes(s.sector_id));
   }, [sectors]);
   

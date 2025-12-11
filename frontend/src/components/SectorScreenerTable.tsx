@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from 'react-query';
 import { api } from '../api/client';
 import { mapRowToUiKeys, UI_COLUMNS } from '../utils/columnMapper';
+import DataFreshness from './DataFreshness';
 
 interface SectorScreenerTableProps {
   sectorKey: string;
@@ -418,6 +419,18 @@ function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
             <div className="text-sm text-dark-400 mt-1">
               Sorted by: <span className="text-blue-400 font-medium">{currentSortField}</span> ({currentSortDirection === 'asc' ? 'Low to High' : 'High to Low'})
             </div>
+            {data.metadata && (
+              <div className="mt-2">
+                <DataFreshness
+                  lastUpdated={data.metadata.last_updated}
+                  fetchedAt={data.metadata.fetched_at}
+                  isLive={data.metadata.is_live}
+                  source="Stock screener"
+                  refreshInterval={300000}
+                  compact
+                />
+              </div>
+            )}
           </div>
           <button
             onClick={handleExportCSV}

@@ -17,6 +17,7 @@ import EarningsWatch from '../components/EarningsWatch';
 import MacroIndicators from '../components/MacroIndicators';
 import NewsFeed from '../components/NewsFeed';
 import VolatilityHeatmap from '../components/VolatilityHeatmap';
+import DataFreshness from '../components/DataFreshness';
 
 function Dashboard() {
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
@@ -26,19 +27,11 @@ function Dashboard() {
   const [showDriverCard, setShowDriverCard] = useState(false);
   const [driverCardSector, setDriverCardSector] = useState<string | null>(null);
 
-  const { data: sectors, isLoading: sectorsLoading, error: sectorsError } = useQuery(
-    'sectors',
+  const { data: sectorsResponse, isLoading: sectorsLoading, error: sectorsError, dataUpdatedAt } = useQuery(
+    'sectors-with-metadata',
     async () => {
       try {
-        const data = await api.getSectors();
-        console.log('API response:', { type: typeof data, isArray: Array.isArray(data), length: Array.isArray(data) ? data.length : 'N/A', data });
-        // Ensure we always return an array
-        if (!Array.isArray(data)) {
-          console.error('API returned non-array data:', data);
-          return [];
-        }
-        console.log('Returning sectors:', data.length);
-        return data;
+        return await api.getSectorsWithMetadata();
       } catch (error) {
         console.error('Failed to fetch sectors:', error);
         throw error;
@@ -52,6 +45,9 @@ function Dashboard() {
       }
     }
   );
+
+  const sectors = sectorsResponse?.data || [];
+  const sectorsMetadata = sectorsResponse?.metadata;
 
   const { data: forecasts, isLoading: forecastsLoading } = useQuery(
     ['forecasts', sectors],
@@ -153,6 +149,16 @@ function Dashboard() {
               </Link>
             </div>
             <div className="flex items-center gap-4">
+              {sectorsMetadata && (
+                <DataFreshness
+                  lastUpdated={sectorsMetadata.last_updated}
+                  fetchedAt={sectorsMetadata.fetched_at}
+                  isLive={sectorsMetadata.is_live}
+                  source="Market data"
+                  refreshInterval={300000}
+                  compact
+                />
+              )}
               <input
                 type="date"
                 value={selectedDate}

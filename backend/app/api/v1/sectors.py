@@ -1,9 +1,9 @@
 """Sector-related API endpoints."""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
-from datetime import date
-from sqlalchemy import desc
+from typing import List, Optional, Dict, Any
+from datetime import date, datetime
+from sqlalchemy import desc, func
 import pandas as pd
 import numpy as np
 from app.db import database, crud, models
@@ -56,12 +56,23 @@ SECTOR_NAMES = {
 }
 
 
-@router.get("/sectors", response_model=List[SectorSummary])
-def get_sectors(db: Session = Depends(database.get_db)):
+@router.get("/sectors")
+def get_sectors(db: Session = Depends(database.get_db)) -> Dict[str, Any]:
     """
     Get list of all sectors with current performance metrics.
     Returns all sectors defined in SECTOR_NAMES, even if they don't have data yet.
     """
+    # Get latest data timestamp
+    latest_ts = db.query(func.max(models.SectorTimeSeries.ts)).scalar()
+    latest_features_date = db.query(func.max(models.SectorFeatures.date)).scalar()
+    
+    # Determine latest update time
+    last_updated = None
+    if latest_ts:
+        last_updated = latest_ts.isoformat()
+    elif latest_features_date:
+        last_updated = latest_features_date.isoformat()
+    
     # Get all sectors from database
     sectors_with_data = crud.get_all_sectors(db)
     
@@ -150,7 +161,16 @@ def get_sectors(db: Session = Depends(database.get_db)):
     
     # Sort by name for better UX
     result.sort(key=lambda x: x.name)
-    return result
+    
+    return {
+        "sectors": result,
+        "metadata": {
+            "last_updated": last_updated,
+            "fetched_at": datetime.utcnow().isoformat(),
+            "is_live": False,  # Market data is typically end-of-day
+            "count": len(result)
+        }
+    }
 
 
 @router.get("/sectors/{sector_id}/timeseries", response_model=List[TimeseriesPoint])

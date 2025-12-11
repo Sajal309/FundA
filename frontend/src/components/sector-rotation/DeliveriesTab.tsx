@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from 'react-query';
 import { api } from '../../api/client';
+import DataFreshness from '../DataFreshness';
 
 interface DeliveriesTabProps {
   level: 'sector' | 'industry';
@@ -81,12 +82,25 @@ function DeliveriesTab({ level, date }: DeliveriesTabProps) {
   return (
     <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-dark-100 mb-2">
-          Looking for {level === 'sector' ? 'Sectors' : 'Industries'} with higher delivery?
-        </h2>
-        <p className="text-sm text-dark-400">
-          Track how the money is moving from one {level === 'sector' ? 'Sector' : 'Industry'} to another
-        </p>
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <h2 className="text-xl font-semibold text-dark-100 mb-2">
+              Looking for {level === 'sector' ? 'Sectors' : 'Industries'} with higher delivery?
+            </h2>
+            <p className="text-sm text-dark-400">
+              Track how the money is moving from one {level === 'sector' ? 'Sector' : 'Industry'} to another
+            </p>
+          </div>
+          {data.metadata && (
+            <DataFreshness
+              lastUpdated={data.metadata.last_updated}
+              fetchedAt={data.metadata.fetched_at}
+              isLive={data.metadata.is_live}
+              source={`${level === 'sector' ? 'Sector' : 'Industry'} deliveries`}
+              compact
+            />
+          )}
+        </div>
       </div>
 
       <div className="overflow-x-auto">

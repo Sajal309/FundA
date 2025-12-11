@@ -201,15 +201,69 @@ export interface NewsHeadline {
   sentiment_label?: string;
 }
 
+export interface ApiMetadata {
+  last_updated?: string | null;
+  fetched_at?: string | null;
+  is_live?: boolean;
+  [key: string]: any;
+}
+
+export interface ApiResponse<T> {
+  data: T;
+  metadata?: ApiMetadata;
+}
+
 export const api = {
   getSectors: async (): Promise<SectorSummary[]> => {
     const response = await client.get('/api/v1/sectors');
-    return response.data;
+    // Handle both old format (array) and new format (object with sectors and metadata)
+    if (Array.isArray(response.data)) {
+      return response.data;
+    }
+    return response.data.sectors || [];
+  },
+
+  getSectorsWithMetadata: async (): Promise<ApiResponse<SectorSummary[]>> => {
+    const response = await client.get('/api/v1/sectors');
+    if (Array.isArray(response.data)) {
+      return {
+        data: response.data,
+        metadata: {
+          fetched_at: new Date().toISOString(),
+          is_live: false,
+        },
+      };
+    }
+    return {
+      data: response.data.sectors || [],
+      metadata: response.data.metadata,
+    };
   },
 
   getSectorForecast: async (sectorId: string): Promise<ForecastResponse> => {
     const response = await client.get(`/api/v1/sectors/${sectorId}/forecast`);
+    // Handle both old format (ForecastResponse) and new format (object with forecast and metadata)
+    if (response.data.forecast) {
+      return response.data.forecast;
+    }
     return response.data;
+  },
+
+  getSectorForecastWithMetadata: async (sectorId: string): Promise<ApiResponse<ForecastResponse>> => {
+    const response = await client.get(`/api/v1/sectors/${sectorId}/forecast`);
+    if (response.data.forecast) {
+      return {
+        data: response.data.forecast,
+        metadata: response.data.metadata,
+      };
+    }
+    return {
+      data: response.data,
+      metadata: {
+        fetched_at: new Date().toISOString(),
+        is_live: false,
+      },
+    };
   },
 
   getSectorTimeseries: async (
@@ -340,6 +394,7 @@ export const api = {
         pct_above_sma100: number;
       };
     }>;
+    metadata?: ApiMetadata;
   }> => {
     const response = await client.get('/api/v1/sector-rotation/breadth', {
       params: { level, date, metric_type: metricType },
@@ -362,6 +417,7 @@ export const api = {
       score_3m: number;
       score_6m: number;
     }>;
+    metadata?: ApiMetadata;
   }> => {
     const response = await client.get('/api/v1/sector-rotation/scores', {
       params: { level, date },
@@ -389,6 +445,7 @@ export const api = {
       delivery_value_avg: number;
       delivery_value_multiple: number;
     }>;
+    metadata?: ApiMetadata;
   }> => {
     const response = await client.get('/api/v1/sector-rotation/deliveries', {
       params: { level, date },
@@ -408,6 +465,7 @@ export const api = {
       mcap: number;
       pct_mcap_price_above_vwap: number;
     }>;
+    metadata?: ApiMetadata;
   }> => {
     const response = await client.get('/api/v1/sector-rotation/vwap', {
       params: { level, date },
@@ -427,6 +485,7 @@ export const api = {
     count: number;
     primarySort: { field: string; direction: string };
     secondarySort?: { field: string; direction: string };
+    metadata?: ApiMetadata;
   }> => {
     const response = await client.get('/api/v1/sector-screener', {
       params: { sector, limit },

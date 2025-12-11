@@ -1,5 +1,6 @@
 import { useQuery } from 'react-query';
 import { api } from '../../api/client';
+import DataFreshness from '../DataFreshness';
 
 interface VWAPTabProps {
   level: 'sector' | 'industry';
@@ -48,12 +49,25 @@ function VWAPTab({ level, date }: VWAPTabProps) {
   return (
     <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-dark-100 mb-2">
-          VWAP Analysis for {level === 'sector' ? 'Sectors' : 'Industries'}
-        </h2>
-        <p className="text-sm text-dark-400">
-          Percentage of market cap where price is above VWAP
-        </p>
+        <div className="flex items-start justify-between mb-2">
+          <div>
+            <h2 className="text-xl font-semibold text-dark-100 mb-2">
+              VWAP Analysis for {level === 'sector' ? 'Sectors' : 'Industries'}
+            </h2>
+            <p className="text-sm text-dark-400">
+              Percentage of market cap where price is above VWAP
+            </p>
+          </div>
+          {data.metadata && (
+            <DataFreshness
+              lastUpdated={data.metadata.last_updated}
+              fetchedAt={data.metadata.fetched_at}
+              isLive={data.metadata.is_live}
+              source={`${level === 'sector' ? 'Sector' : 'Industry'} VWAP`}
+              compact
+            />
+          )}
+        </div>
       </div>
 
       <div className="overflow-x-auto">

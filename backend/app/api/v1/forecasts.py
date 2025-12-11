@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
-from datetime import date
+from datetime import date, datetime
 from app.db import database, crud, models
 from app.db.schemas import ForecastResponse, ForecastDriver
 from app.services import forecasts, sentiment_market
@@ -12,13 +12,14 @@ from sqlalchemy import desc
 router = APIRouter()
 
 
-@router.get("/sectors/{sector_id}/forecast", response_model=ForecastResponse)
+@router.get("/sectors/{sector_id}/forecast")
 def get_sector_forecast(
     sector_id: str,
     db: Session = Depends(database.get_db)
 ):
     """
     Get 3-month forecast for a sector.
+    Returns forecast data with metadata about freshness.
     """
     # Try to get existing forecast
     forecast = crud.get_latest_sector_forecast(db, sector_id)
@@ -43,7 +44,7 @@ def get_sector_forecast(
                 impact=driver_data.get("impact", "neutral")
             ))
     
-    return ForecastResponse(
+    forecast_response = ForecastResponse(
         sector_id=forecast.sector_id,
         date=forecast.date,
         forecast_3m_label=forecast.forecast_3m_label,
@@ -55,6 +56,17 @@ def get_sector_forecast(
         quarter_score=forecast.quarter_score,
         drivers=forecast.drivers
     )
+    
+    # Return with metadata for backward compatibility
+    # Frontend can access forecast directly or use metadata
+    return {
+        "forecast": forecast_response.dict(),
+        "metadata": {
+            "last_updated": forecast.date.isoformat(),
+            "fetched_at": datetime.utcnow().isoformat(),
+            "is_live": False,  # Forecasts are computed, not live
+        }
+    }
 
 
 @router.get("/flows")

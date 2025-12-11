@@ -1,6 +1,6 @@
 """Sector Rotation API endpoints."""
-from typing import List, Literal, Optional
-from datetime import date as date_type
+from typing import List, Literal, Optional, Dict, Any
+from datetime import date as date_type, datetime
 from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
@@ -37,7 +37,12 @@ def get_breadth_metrics(
         "date": date,
         "level": level,
         "metric_type": metric_type,
-        "data": results
+        "data": results,
+        "metadata": {
+            "last_updated": date,
+            "fetched_at": datetime.utcnow().isoformat(),
+            "is_live": False,  # Historical snapshot data
+        }
     }
 
 
@@ -57,7 +62,12 @@ def get_momentum_scores(
     return {
         "date": date,
         "level": level,
-        "data": results
+        "data": results,
+        "metadata": {
+            "last_updated": date,
+            "fetched_at": datetime.utcnow().isoformat(),
+            "is_live": False,
+        }
     }
 
 
@@ -77,7 +87,12 @@ def get_delivery_stats(
     return {
         "date": date,
         "level": level,
-        "data": results
+        "data": results,
+        "metadata": {
+            "last_updated": date,
+            "fetched_at": datetime.utcnow().isoformat(),
+            "is_live": False,
+        }
     }
 
 
@@ -97,5 +112,10 @@ def get_vwap_metrics(
     return {
         "date": date,
         "level": level,
-        "data": results
+        "data": results,
+        "metadata": {
+            "last_updated": date,
+            "fetched_at": datetime.utcnow().isoformat(),
+            "is_live": False,
+        }
     }
