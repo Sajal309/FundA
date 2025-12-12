@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from datetime import date, datetime
 from app.db import database, crud, models
 from app.db.schemas import ForecastResponse, ForecastDriver
-from app.services import forecasts, sentiment_market
+from app.services import forecasts, sentiment_market, forecast_backtest
 from app.utils import logger
 from sqlalchemy import desc
 
@@ -160,6 +160,51 @@ def get_quarter_outlook(
         "as_of": latest_date.isoformat() if latest_date else date.today().isoformat(),
         "sectors": sector_forecasts
     }
+
+
+@router.get("/forecast-quality")
+def get_forecast_quality(
+    sector_id: Optional[str] = None,
+    db: Session = Depends(database.get_db)
+) -> Dict[str, Any]:
+    """
+    Get forecast quality metrics.
+    
+    Returns metrics about forecast accuracy, data completeness, and confidence.
+    """
+    metrics = forecast_backtest.get_forecast_quality_metrics(db, sector_id)
+    return metrics
+
+
+@router.get("/forecast-accuracy")
+def get_forecast_accuracy(
+    sector_id: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
+    db: Session = Depends(database.get_db)
+) -> Dict[str, Any]:
+    """
+    Evaluate forecast accuracy by comparing forecasts to realized returns.
+    
+    Args:
+        sector_id: Specific sector (optional)
+        from_date: Start date (YYYY-MM-DD, optional)
+        to_date: End date (YYYY-MM-DD, optional)
+    """
+    from datetime import date as date_type
+    
+    from_date_obj = None
+    if from_date:
+        from_date_obj = date_type.fromisoformat(from_date)
+    
+    to_date_obj = None
+    if to_date:
+        to_date_obj = date_type.fromisoformat(to_date)
+    
+    accuracy = forecast_backtest.evaluate_forecast_accuracy(
+        db, sector_id, from_date_obj, to_date_obj
+    )
+    return accuracy
 
 
 @router.get("/market-sentiment")

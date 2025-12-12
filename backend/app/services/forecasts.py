@@ -299,25 +299,61 @@ def compute_rule_forecast(
             "top_drivers": drivers[:5]  # Top 5 drivers
         }
     else:
-        # When using QuarterScore, map it to forecast labels
-        if quarter_score >= 2.0:
+        # When using QuarterScore, map it to forecast labels with smooth transitions
+        # QuarterScore typically ranges from -3 to +3
+        # Use continuous mapping instead of hard thresholds
+        
+        # Map QuarterScore to probabilities and expected return
+        # Score > 1.5: Strong UP
+        # Score 0.5 to 1.5: Moderate UP
+        # Score -0.5 to 0.5: NEUTRAL (with variation)
+        # Score -1.5 to -0.5: Moderate DOWN
+        # Score < -1.5: Strong DOWN
+        
+        if quarter_score >= 1.5:
             label = "UP"
-            prob_up = min(0.95, 0.7 + 0.05 * (quarter_score - 2.0))
+            # Strong positive: 70-95% UP probability
+            prob_up = min(0.95, 0.70 + 0.05 * (quarter_score - 1.5))
+            prob_neutral = (1 - prob_up) * 0.5
+            prob_down = 1 - prob_up - prob_neutral
+            expected_return = min(8.0, 3.0 + 0.5 * (quarter_score - 1.5))
+        elif quarter_score >= 0.5:
+            label = "UP"
+            # Moderate positive: 50-70% UP probability
+            prob_up = 0.50 + 0.20 * ((quarter_score - 0.5) / 1.0)
             prob_neutral = (1 - prob_up) * 0.6
             prob_down = 1 - prob_up - prob_neutral
-            expected_return = min(8.0, 3.0 + 0.5 * (quarter_score - 2.0))
-        elif quarter_score >= -1.0:
+            expected_return = 1.0 + 2.0 * ((quarter_score - 0.5) / 1.0)
+        elif quarter_score >= -0.5:
             label = "NEUTRAL"
-            prob_neutral = 0.6
-            prob_up = (1 - prob_neutral) * 0.5
-            prob_down = 1 - prob_neutral - prob_up
-            expected_return = 0.0
-        else:
+            # Neutral zone: vary probabilities based on score
+            # At 0.0: 50% neutral, 25% up, 25% down
+            # At 0.5: 40% neutral, 40% up, 20% down
+            # At -0.5: 40% neutral, 20% up, 40% down
+            if quarter_score >= 0:
+                # Positive side of neutral
+                prob_up = 0.25 + 0.15 * (quarter_score / 0.5)
+                prob_down = 0.25 - 0.05 * (quarter_score / 0.5)
+            else:
+                # Negative side of neutral
+                prob_up = 0.25 - 0.05 * (-quarter_score / 0.5)
+                prob_down = 0.25 + 0.15 * (-quarter_score / 0.5)
+            prob_neutral = 1 - prob_up - prob_down
+            expected_return = 0.0 + 1.0 * quarter_score  # Linear from -0.5% to +0.5%
+        elif quarter_score >= -1.5:
             label = "DOWN"
-            prob_down = min(0.95, 0.7 + 0.05 * (-quarter_score - 1.0))
+            # Moderate negative: 50-70% DOWN probability
+            prob_down = 0.50 + 0.20 * ((-quarter_score - 0.5) / 1.0)
             prob_neutral = (1 - prob_down) * 0.6
             prob_up = 1 - prob_down - prob_neutral
-            expected_return = max(-8.0, -3.0 - 0.5 * (-quarter_score - 1.0))
+            expected_return = -1.0 - 2.0 * ((-quarter_score - 0.5) / 1.0)
+        else:
+            label = "DOWN"
+            # Strong negative: 70-95% DOWN probability
+            prob_down = min(0.95, 0.70 + 0.05 * (-quarter_score - 1.5))
+            prob_neutral = (1 - prob_down) * 0.5
+            prob_up = 1 - prob_down - prob_neutral
+            expected_return = max(-8.0, -3.0 - 0.5 * (-quarter_score - 1.5))
         
         # Ensure probabilities sum to 1.0
         total_prob = prob_up + prob_neutral + prob_down

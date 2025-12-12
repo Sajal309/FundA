@@ -1,16 +1,20 @@
 import { useQuery } from 'react-query';
 import { api, QuarterOutlookSector } from '../api/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import HelpIcon from './HelpIcon';
 
 interface QuarterOutlookRankingProps {
   onSectorClick?: (sectorId: string) => void;
 }
 
 function QuarterOutlookRanking({ onSectorClick }: QuarterOutlookRankingProps) {
-  const { data, isLoading } = useQuery(
+  const { data, isLoading, refetch } = useQuery(
     'quarter-outlook',
     api.getQuarterOutlook,
-    { refetchInterval: 300000 }
+    { 
+      refetchInterval: 300000, // Refetch every 5 minutes
+      staleTime: 60000, // Consider data stale after 1 minute
+    }
   );
 
   if (isLoading) {
@@ -62,7 +66,24 @@ function QuarterOutlookRanking({ onSectorClick }: QuarterOutlookRankingProps) {
   return (
     <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-dark-100">Quarter Outlook Ranking</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-dark-100">Quarter Outlook Ranking</h3>
+          <HelpIcon
+            title="Quarter Outlook Ranking"
+            content={`This section ranks sectors by their QuarterScore, a composite metric that predicts 3-month performance.
+
+What it shows:
+• QuarterScore: Combines momentum, breadth, flows, valuation, earnings, sentiment, and macro factors
+• Forecast Label: UP, NEUTRAL, or DOWN prediction
+• Expected Return: Projected 3-month return percentage
+
+What to infer:
+• Higher scores (green) indicate stronger fundamentals and positive momentum
+• Lower scores (red) suggest weakness or headwinds
+• Use this to identify sectors with the best risk-adjusted outlook
+• Combine with other metrics for confirmation before making decisions`}
+          />
+        </div>
         <span className="text-xs text-dark-400">As of {new Date(data.as_of).toLocaleDateString()}</span>
       </div>
       

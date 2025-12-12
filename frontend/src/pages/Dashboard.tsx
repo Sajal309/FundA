@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useQuery } from 'react-query';
+import { useState, useEffect, useMemo } from 'react';
+import { useQuery, useQueryClient } from 'react-query';
 import { Link } from 'react-router-dom';
 import { api, SectorSummary, ForecastResponse } from '../api/client';
 import Navigation from '../components/Navigation';
@@ -18,8 +18,81 @@ import MacroIndicators from '../components/MacroIndicators';
 import NewsFeed from '../components/NewsFeed';
 import VolatilityHeatmap from '../components/VolatilityHeatmap';
 import DataFreshness from '../components/DataFreshness';
+import HelpIcon from '../components/HelpIcon';
+
+// Sectors to hide in main view and show under "Other Indexes"
+const OTHER_INDEXES = new Set([
+  'NIFTY_100',
+  'NIFTY_200',
+  'NIFTY_500',
+  'NIFTY_ALPHA_50',
+  'NIFTY_COMMODITIES',
+  'NIFTY_DIVIDEND_OPPORTUNITIES_50',
+  'NIFTY_LOW_VOLATILITY_50',
+  'NIFTY_MIDCAP_50',
+  'NIFTY_MIDCAP_100',
+  'NIFTY_MIDCAP_150',
+  'NIFTY_NEXT_50',
+  'NIFTY_QUALITY_30',
+  'NIFTY_SMALLCAP_50',
+  'NIFTY_SMALLCAP_100',
+  'NIFTY_SMALLCAP_250',
+]);
+
+// OtherIndexesSection component
+function OtherIndexesSection({ 
+  otherIndexes, 
+  forecasts, 
+  onSectorClick 
+}: { 
+  otherIndexes: SectorSummary[];
+  forecasts?: ForecastResponse[];
+  onSectorClick: (sectorId: string) => void;
+}) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  return (
+    <div className="border border-dark-700 rounded-lg bg-dark-800/50">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full px-4 py-3 flex items-center justify-between hover:bg-dark-700/50 transition-colors rounded-t-lg"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-lg font-semibold text-dark-100">Other Indexes</span>
+          <span className="text-sm text-dark-400">({otherIndexes.length} indexes)</span>
+        </div>
+        <svg
+          className={`w-5 h-5 text-dark-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {isExpanded && (
+        <div className="p-4 border-t border-dark-700">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
+            {otherIndexes.map((sector) => {
+              const forecast = forecasts?.find((f) => f.sector_id === sector.sector_id);
+              return (
+                <SectorTile
+                  key={sector.sector_id}
+                  sector={sector}
+                  forecast={forecast}
+                  onClick={() => onSectorClick(sector.sector_id)}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Dashboard() {
+  const queryClient = useQueryClient();
   const [selectedSector, setSelectedSector] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0]
@@ -49,7 +122,26 @@ function Dashboard() {
   const sectors = sectorsResponse?.data || [];
   const sectorsMetadata = sectorsResponse?.metadata;
 
-  const { data: forecasts, isLoading: forecastsLoading } = useQuery(
+  // Separate main sectors from other indexes
+  const { mainSectors, otherIndexes } = useMemo(() => {
+    if (!Array.isArray(sectors)) {
+      return { mainSectors: [], otherIndexes: [] };
+    }
+    const main: SectorSummary[] = [];
+    const other: SectorSummary[] = [];
+    
+    sectors.forEach((sector) => {
+      if (OTHER_INDEXES.has(sector.sector_id)) {
+        other.push(sector);
+      } else {
+        main.push(sector);
+      }
+    });
+    
+    return { mainSectors: main, otherIndexes: other };
+  }, [sectors]);
+
+  const { data: forecasts, isLoading: forecastsLoading, refetch: refetchForecasts } = useQuery(
     ['forecasts', sectors],
     async () => {
       if (!sectors || !Array.isArray(sectors)) return [];
@@ -59,7 +151,11 @@ function Dashboard() {
       const results = await Promise.all(forecastPromises);
       return results.filter((f): f is ForecastResponse => f !== null);
     },
-    { enabled: !!sectors && Array.isArray(sectors) }
+    { 
+      enabled: !!sectors && Array.isArray(sectors),
+      refetchInterval: 300000, // Refetch every 5 minutes
+      staleTime: 60000, // Consider data stale after 1 minute
+    }
   );
 
   const { data: driverCardForecast } = useQuery(
@@ -166,7 +262,13 @@ function Dashboard() {
                 className="px-3 py-2 border border-dark-600 bg-dark-700 text-dark-100 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <button
-                onClick={() => window.location.reload()}
+                onClick={() => {
+                  // Invalidate and refetch all forecast-related queries
+                  queryClient.invalidateQueries(['forecasts']);
+                  queryClient.invalidateQueries(['quarter-outlook']);
+                  queryClient.invalidateQueries(['forecast']);
+                  refetchForecasts();
+                }}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
                 Refresh
@@ -229,11 +331,11 @@ function Dashboard() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-semibold text-dark-100">Sector Performance</h2>
             <div className="text-sm text-dark-400">
-              {sectors ? `${sectors.length} sectors` : 'Loading...'}
+              {mainSectors.length} sectors{otherIndexes.length > 0 ? ` (+ ${otherIndexes.length} other indexes)` : ''}
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4">
-            {Array.isArray(sectors) && sectors.map((sector) => {
+            {mainSectors.map((sector) => {
               const forecast = forecasts?.find((f) => f.sector_id === sector.sector_id);
               return (
                 <SectorTile
@@ -245,11 +347,41 @@ function Dashboard() {
               );
             })}
           </div>
+
+          {/* Other Indexes - Collapsible */}
+          {otherIndexes.length > 0 && (
+            <div className="mt-6">
+              <OtherIndexesSection
+                otherIndexes={otherIndexes}
+                forecasts={forecasts}
+                onSectorClick={setSelectedSector}
+              />
+            </div>
+          )}
         </section>
 
         {/* Forecast Ribbon */}
         <section className="mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-dark-100">3-Month Forecasts</h2>
+          <div className="flex items-center gap-2 mb-4">
+            <h2 className="text-xl font-semibold text-dark-100">3-Month Forecasts</h2>
+            <HelpIcon
+              title="3-Month Forecasts"
+              content={`This table shows 3-month forward-looking predictions for all sectors.
+
+What it shows:
+• Forecast Label: Directional prediction (UP, NEUTRAL, DOWN)
+• Probability: Distribution of UP/NEUTRAL/DOWN probabilities
+• Expected Return: Projected 3-month return percentage
+
+What to infer:
+• UP forecasts with high probability suggest strong momentum ahead
+• NEUTRAL forecasts indicate range-bound or uncertain conditions
+• DOWN forecasts warn of potential weakness or headwinds
+• Compare expected returns across sectors to identify opportunities
+• Use probabilities to assess confidence - higher probabilities = more conviction
+• Combine with other metrics (breadth, valuation) for confirmation`}
+            />
+          </div>
           <div className="bg-dark-800 rounded-lg shadow-lg overflow-hidden border border-dark-700">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-dark-700">

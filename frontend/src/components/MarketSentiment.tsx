@@ -1,5 +1,6 @@
 import { useQuery } from 'react-query';
 import { api } from '../api/client';
+import HelpIcon from './HelpIcon';
 
 interface MarketSentimentData {
   date: string;

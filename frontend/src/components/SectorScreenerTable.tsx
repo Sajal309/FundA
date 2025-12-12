@@ -21,8 +21,10 @@ interface ScreenerResponse {
 type SortField = string | null;
 type SortDirection = 'asc' | 'desc';
 type ViewMode = 'sector-wise' | 'regular';
+type MarketCapCategory = 'all' | 'large' | 'mid' | 'small';
 
 interface FilterState {
+  marketCapCategory?: MarketCapCategory;
   market_cap_min?: number;
   market_cap_max?: number;
   cmp_min?: number;
@@ -38,6 +40,13 @@ interface FilterState {
   searchText?: string;
 }
 
+// Market cap ranges (in Crores)
+const MARKET_CAP_RANGES = {
+  large: { min: 20000, max: Infinity },
+  mid: { min: 5000, max: 20000 },
+  small: { min: 0, max: 5000 },
+};
+
 function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('sector-wise');
   const [sortField, setSortField] = useState<SortField>(null);
@@ -49,16 +58,31 @@ function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
   useEffect(() => {
     const saved = localStorage.getItem('lastSelectedSector');
     if (saved && saved !== sectorKey) {
-      // Sector changed, reset sort to primary sort
+      // Sector changed, reset sort to use ranking (score) by default
       setSortField(null);
       setSortDirection('desc');
       setFilters({});
+      // Clear saved sort for old sector
+      localStorage.removeItem(`screener-${saved}-sortField`);
+      localStorage.removeItem(`screener-${saved}-sortDirection`);
     } else {
-      // Load saved sort state
+      // Load saved sort state (only if user explicitly sorted)
       const savedSortField = localStorage.getItem(`screener-${sectorKey}-sortField`);
       const savedSortDirection = localStorage.getItem(`screener-${sectorKey}-sortDirection`);
-      if (savedSortField) setSortField(savedSortField);
-      if (savedSortDirection) setSortDirection(savedSortDirection as SortDirection);
+      // Only restore if it's not 'score' (we want score to be the default, not saved)
+      // Also clear 'score' if it was saved (should use default instead)
+      if (savedSortField && savedSortField !== 'score') {
+        setSortField(savedSortField);
+        if (savedSortDirection) setSortDirection(savedSortDirection as SortDirection);
+      } else {
+        // Default to ranking (score) - clear any saved 'score' preference
+        setSortField(null);
+        setSortDirection('desc');
+        if (savedSortField === 'score') {
+          localStorage.removeItem(`screener-${sectorKey}-sortField`);
+          localStorage.removeItem(`screener-${sectorKey}-sortDirection`);
+        }
+      }
 
       // Load saved filters
       const savedFilters = localStorage.getItem(`screener-${sectorKey}-filters`);
@@ -101,14 +125,24 @@ function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
         if (!nameMatch && !tickerMatch) return false;
       }
 
-      // Market cap filter
-      if (filters.market_cap_min !== undefined && filters.market_cap_min > 0) {
+      // Market cap category filter
+      if (filters.marketCapCategory && filters.marketCapCategory !== 'all') {
         const mcap = row.market_cap || row.marketCap;
-        if (!mcap || mcap < filters.market_cap_min) return false;
+        if (!mcap) return false;
+        const range = MARKET_CAP_RANGES[filters.marketCapCategory];
+        if (mcap < range.min || mcap >= range.max) return false;
       }
-      if (filters.market_cap_max !== undefined && filters.market_cap_max > 0) {
-        const mcap = row.market_cap || row.marketCap;
-        if (!mcap || mcap > filters.market_cap_max) return false;
+
+      // Market cap min/max filter (only if category is not set or is 'all')
+      if (!filters.marketCapCategory || filters.marketCapCategory === 'all') {
+        if (filters.market_cap_min !== undefined && filters.market_cap_min > 0) {
+          const mcap = row.market_cap || row.marketCap;
+          if (!mcap || mcap < filters.market_cap_min) return false;
+        }
+        if (filters.market_cap_max !== undefined && filters.market_cap_max > 0) {
+          const mcap = row.market_cap || row.marketCap;
+          if (!mcap || mcap > filters.market_cap_max) return false;
+        }
       }
 
       // CMP filter
@@ -156,14 +190,44 @@ function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
       return true;
     });
 
+    // Check if backend provided ranking (has 'score' field)
+    // Check BEFORE filtering to ensure we detect ranking even if some rows are filtered out
+    const hasRanking = data.rows && data.rows.length > 0 && (
+      'score' in data.rows[0] || 
+      data.rows.some(row => row.score !== undefined && row.score !== null) ||
+      data.primarySort?.field === 'score'
+    );
+    
     // Determine sort field and direction
-    const defaultSortField = viewMode === 'regular' 
-      ? (data.primarySort?.field || 'roce')
-      : (data.primarySort?.field || (data?.columns?.[0]?.field) || 'name');
+    // If backend provided ranking (score field), default to score unless user explicitly sorted
+    let defaultSortField: string;
+    if (hasRanking && !sortField) {
+      // Backend ranking is active - use score as default
+      defaultSortField = 'score';
+    } else {
+      // Fallback to primarySort or other defaults
+      defaultSortField = viewMode === 'regular' 
+        ? (data.primarySort?.field || 'roce')
+        : (data.primarySort?.field || (data?.columns?.[0]?.field) || 'name');
+    }
+    
     const currentSortField = sortField || defaultSortField;
-    const currentSortDirection = sortField ? sortDirection : (data.primarySort?.direction === 'asc' ? 'asc' : 'desc');
+    const currentSortDirection = sortField ? sortDirection : (hasRanking && currentSortField === 'score' ? 'desc' : (data.primarySort?.direction === 'asc' ? 'asc' : 'desc'));
 
-    // Sort rows
+    // CRITICAL: If backend provided ranking and user hasn't explicitly sorted, preserve backend order
+    // Backend already sorted by score, so we should NOT re-sort
+    // When hasRanking is true and sortField is null, defaultSortField will be 'score', so currentSortField will be 'score'
+    if (hasRanking && !sortField) {
+      // Backend already sorted by score, preserve that order
+      // Just ensure rank is set (use backend rank if available, otherwise use index)
+      // IMPORTANT: Don't re-sort - backend order is already correct
+      return filtered.map((row, idx) => ({
+        ...row,
+        rank: row.rank !== undefined ? row.rank : idx + 1, // Use backend rank if available
+      }));
+    }
+
+    // Sort rows (user explicitly sorted or no ranking available)
     filtered.sort((a, b) => {
       const aVal = a[currentSortField];
       const bVal = b[currentSortField];
@@ -187,7 +251,7 @@ function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
     // Add rank based on sorted order
     return filtered.map((row, idx) => ({
       ...row,
-      rank: idx + 1,
+      rank: row.rank || idx + 1, // Preserve backend rank if available, otherwise use sorted position
     }));
   }, [data?.rows, data?.primarySort, sortField, sortDirection, viewMode, filters]);
 
@@ -221,7 +285,10 @@ function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
   };
 
   const hasActiveFilters = () => {
-    return Object.values(filters).some(v => v !== undefined && v !== '');
+    return Object.entries(filters).some(([key, value]) => {
+      if (key === 'marketCapCategory') return value !== undefined && value !== 'all';
+      return value !== undefined && value !== '';
+    });
   };
 
   const formatValue = (value: any, field: string): string => {
@@ -382,7 +449,7 @@ function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
     );
   }
 
-  if (!data || processedRows.length === 0) {
+  if (!data) {
     return (
       <div className="bg-dark-800 rounded-lg shadow-lg border border-dark-700 p-12">
         <div className="text-center">
@@ -395,12 +462,25 @@ function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
     );
   }
 
-  // Determine default sort field based on view mode
-  const defaultSortField = viewMode === 'regular' 
-    ? (data.primarySort?.field || 'roce')
-    : (data.primarySort?.field || (data?.columns?.[0]?.field) || 'name');
-  const currentSortField = sortField || defaultSortField;
-  const currentSortDirection = sortField ? sortDirection : (data.primarySort?.direction === 'asc' ? 'asc' : 'desc');
+  // Determine sort field and direction for display (matching logic from processedRows)
+  // Check if backend provided ranking - use the same robust check as in processedRows
+  const hasScoreFieldForDisplay = data?.rows && data.rows.length > 0 && (
+    'score' in data.rows[0] || 
+    data.rows.some(row => row.score !== undefined && row.score !== null)
+  );
+  const hasRankingForDisplay = hasScoreFieldForDisplay || data?.primarySort?.field === 'score';
+  
+  let defaultSortFieldForDisplay: string;
+  if (hasRankingForDisplay && !sortField) {
+    defaultSortFieldForDisplay = 'score';
+  } else {
+    defaultSortFieldForDisplay = viewMode === 'regular' 
+      ? (data?.primarySort?.field || 'roce')
+      : (data?.primarySort?.field || (data?.columns?.[0]?.field) || 'name');
+  }
+  
+  const currentSortField = sortField || defaultSortFieldForDisplay;
+  const currentSortDirection = sortField ? sortDirection : (hasRankingForDisplay && currentSortField === 'score' ? 'desc' : (data?.primarySort?.direction === 'asc' ? 'asc' : 'desc'));
 
   // Determine which columns to display
   const displayColumns = viewMode === 'regular' 
@@ -417,7 +497,9 @@ function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
               {data.label} - {processedRows.length} {hasActiveFilters() ? `of ${data.count}` : ''} stocks
             </h2>
             <div className="text-sm text-dark-400 mt-1">
-              Sorted by: <span className="text-blue-400 font-medium">{currentSortField}</span> ({currentSortDirection === 'asc' ? 'Low to High' : 'High to Low'})
+              Sorted by: <span className="text-blue-400 font-medium">
+                {currentSortField === 'score' ? 'Ranking Score' : currentSortField}
+              </span> ({currentSortDirection === 'asc' ? 'Low to High' : 'High to Low'})
             </div>
             {data.metadata && (
               <div className="mt-2">
@@ -444,28 +526,55 @@ function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
 
         {/* View Mode Toggle and Filters */}
         <div className="flex items-center justify-between flex-wrap gap-4 border-t border-dark-700 pt-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-dark-400 mr-2">View:</span>
-            <button
-              onClick={() => setViewMode('sector-wise')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'sector-wise'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
-              }`}
-            >
-              Sector Wise
-            </button>
-            <button
-              onClick={() => setViewMode('regular')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'regular'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
-              }`}
-            >
-              Regular Columns
-            </button>
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-dark-400 mr-2">View:</span>
+              <button
+                onClick={() => setViewMode('sector-wise')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'sector-wise'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
+                }`}
+              >
+                Sector Wise
+              </button>
+              <button
+                onClick={() => setViewMode('regular')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'regular'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
+                }`}
+              >
+                Regular Columns
+              </button>
+            </div>
+            
+            {/* Market Cap Category Filter */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-dark-400 mr-2">Market Cap:</span>
+              {(['all', 'large', 'mid', 'small'] as MarketCapCategory[]).map((category) => (
+                <button
+                  key={category}
+                  onClick={() => handleFilterChange('marketCapCategory', category === filters.marketCapCategory ? undefined : category)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    filters.marketCapCategory === category
+                      ? 'bg-green-600 text-white'
+                      : 'bg-dark-700 text-dark-300 hover:bg-dark-600'
+                  }`}
+                  title={
+                    category === 'all' ? 'All stocks' :
+                    category === 'large' ? 'Large Cap (> ₹20,000 Cr)' :
+                    category === 'mid' ? 'Mid Cap (₹5,000 - ₹20,000 Cr)' :
+                    'Small Cap (< ₹5,000 Cr)'
+                  }
+                >
+                  {category === 'all' ? 'All' : category === 'large' ? 'Large' : category === 'mid' ? 'Mid' : 'Small'}
+                  {category !== 'all' && ' Cap'}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-2">
             {hasActiveFilters() && (
@@ -517,25 +626,33 @@ function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
               <div>
                 <label className="block text-xs font-medium text-dark-400 mb-1">
                   Market Cap (Cr) Min
+                  {filters.marketCapCategory && filters.marketCapCategory !== 'all' && (
+                    <span className="text-yellow-400 ml-1">(disabled - using category filter)</span>
+                  )}
                 </label>
                 <input
                   type="number"
                   value={filters.market_cap_min || ''}
                   onChange={(e) => handleFilterChange('market_cap_min', e.target.value ? parseFloat(e.target.value) : undefined)}
                   placeholder="Min"
-                  className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-md text-sm text-dark-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={filters.marketCapCategory !== undefined && filters.marketCapCategory !== 'all'}
+                  className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-md text-sm text-dark-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
               <div>
                 <label className="block text-xs font-medium text-dark-400 mb-1">
                   Market Cap (Cr) Max
+                  {filters.marketCapCategory && filters.marketCapCategory !== 'all' && (
+                    <span className="text-yellow-400 ml-1">(disabled - using category filter)</span>
+                  )}
                 </label>
                 <input
                   type="number"
                   value={filters.market_cap_max || ''}
                   onChange={(e) => handleFilterChange('market_cap_max', e.target.value ? parseFloat(e.target.value) : undefined)}
                   placeholder="Max"
-                  className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-md text-sm text-dark-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  disabled={filters.marketCapCategory !== undefined && filters.marketCapCategory !== 'all'}
+                  className="w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-md text-sm text-dark-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -755,63 +872,86 @@ function SectorScreenerTable({ sectorKey }: SectorScreenerTableProps) {
             </tr>
           </thead>
           <tbody className="bg-dark-800 divide-y divide-dark-700">
-            {processedRows.map((row, idx) => (
-              <tr
-                key={row.ticker || idx}
-                className="hover:bg-dark-700 transition-colors"
-              >
-                {/* Rank cell - always shown */}
-                <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-dark-200 sticky left-0 bg-dark-800 z-10">
-                  {row.rank || idx + 1}
+            {processedRows.length === 0 ? (
+              <tr>
+                <td colSpan={displayColumns.length + 1} className="px-6 py-12 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <p className="text-dark-400 text-lg font-medium">No stocks found</p>
+                    <p className="text-dark-500 text-sm">
+                      {hasActiveFilters() 
+                        ? 'Try adjusting your filters or select a different market cap category.'
+                        : 'No data available for this sector.'}
+                    </p>
+                    {hasActiveFilters() && (
+                      <button
+                        onClick={clearFilters}
+                        className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm"
+                      >
+                        Clear All Filters
+                      </button>
+                    )}
+                  </div>
                 </td>
-                {viewMode === 'regular' ? (
-                  // Regular columns view
-                  UI_COLUMNS.filter(col => col.field !== 'rank').map((col) => {
-                    const value = row[col.field];
-                    const formatted = formatValue(value, col.field);
-                    
-                    return (
-                      <td
-                        key={col.field}
-                        className={`px-4 py-3 whitespace-nowrap text-sm text-dark-300 ${
-                          col.field === 'name' ? 'sticky left-12 bg-dark-800 z-10' : ''
-                        }`}
-                      >
-                        {col.field === 'name' && row.url ? (
-                          <a
-                            href={row.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-400 hover:text-blue-300 hover:underline"
-                          >
-                            {formatted}
-                          </a>
-                        ) : (
-                          formatted
-                        )}
-                      </td>
-                    );
-                  })
-                ) : (
-                  // Sector-wise columns view
-                  displayColumns.map((col) => {
-                    const value = row[col.field];
-                    const formatted = formatValue(value, col.label);
-                    
-                    return (
-                      <td
-                        key={col.field}
-                        className={`px-4 py-3 whitespace-nowrap text-sm text-dark-300 ${
-                          col.field === 'name' ? 'sticky left-12 bg-dark-800 z-10' : ''
-                        }`}
-                      >
-                        {formatted}
-                      </td>
-                    );
-                  })
-                )}
               </tr>
-            ))}
+            ) : (
+              processedRows.map((row, idx) => (
+                <tr
+                  key={row.ticker || idx}
+                  className="hover:bg-dark-700 transition-colors"
+                >
+                  {/* Rank cell - always shown */}
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-dark-200 sticky left-0 bg-dark-800 z-10">
+                    {row.rank || idx + 1}
+                  </td>
+                  {viewMode === 'regular' ? (
+                    // Regular columns view
+                    UI_COLUMNS.filter(col => col.field !== 'rank').map((col) => {
+                      const value = row[col.field];
+                      const formatted = formatValue(value, col.field);
+                      
+                      return (
+                        <td
+                          key={col.field}
+                          className={`px-4 py-3 whitespace-nowrap text-sm text-dark-300 ${
+                            col.field === 'name' ? 'sticky left-12 bg-dark-800 z-10' : ''
+                          }`}
+                        >
+                          {col.field === 'name' && row.url ? (
+                            <a
+                              href={row.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-400 hover:text-blue-300 hover:underline"
+                            >
+                              {formatted}
+                            </a>
+                          ) : (
+                            formatted
+                          )}
+                        </td>
+                      );
+                    })
+                  ) : (
+                    // Sector-wise columns view
+                    displayColumns.map((col) => {
+                      const value = row[col.field];
+                      const formatted = formatValue(value, col.label);
+                      
+                      return (
+                        <td
+                          key={col.field}
+                          className={`px-4 py-3 whitespace-nowrap text-sm text-dark-300 ${
+                            col.field === 'name' ? 'sticky left-12 bg-dark-800 z-10' : ''
+                          }`}
+                        >
+                          {formatted}
+                        </td>
+                      );
+                    })
+                  )}
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

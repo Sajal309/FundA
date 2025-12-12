@@ -157,7 +157,12 @@ def create_sample_stocks(db: Session) -> int:
 
 
 def create_stock_time_series_from_sector(db: Session, days: int = 252) -> int:
-    """Create stock time series data derived from sector data."""
+    """
+    Fetch real stock time series data for all stocks.
+    Uses real data sources (NSE → Kite → yfinance), no synthetic data.
+    """
+    from app.services import fetch_real_stocks
+    
     # Get all stocks
     stocks = db.query(models.Stock).all()
     
@@ -165,69 +170,35 @@ def create_stock_time_series_from_sector(db: Session, days: int = 252) -> int:
         logger.warning("No stocks found. Create stocks first.")
         return 0
     
-    # Get sector time series for reference
-    sectors = {}
-    for stock in stocks:
-        if stock.sector_id and stock.sector_id not in sectors:
-            sector_ts = db.query(models.SectorTimeSeries).filter(
-                models.SectorTimeSeries.sector_id == stock.sector_id
-            ).order_by(desc(models.SectorTimeSeries.ts)).limit(days).all()
-            if sector_ts:
-                sectors[stock.sector_id] = sector_ts
+    logger.info(f"Fetching real stock data for {len(stocks)} stocks (last {days} days)")
+    logger.info("Using real data sources: NSE (nsepython) → Kite Connect → yfinance")
     
-    count = 0
-    target_date = date.today()
-    
-    # Get all existing records to avoid duplicates
-    existing_records = db.query(
-        models.StockTimeSeries.ticker,
-        models.StockTimeSeries.date
-    ).all()
-    existing_set = {(r.ticker, r.date) for r in existing_records}
-    
-    for stock in stocks:
-        if stock.sector_id not in sectors:
-            continue
+    total_count = 0
+    for i, stock in enumerate(stocks, 1):
+        logger.info(f"Processing {i}/{len(stocks)}: {stock.ticker}")
         
-        sector_data = sectors[stock.sector_id]
-        if not sector_data:
-            continue
+        # Fetch real stock data (NSE preferred for delivery data)
+        count = fetch_real_stocks.fetch_and_store_stock_data(
+            db=db,
+            ticker=stock.ticker,
+            sector_id=stock.sector_id,
+            days=days,
+            prefer_kite=True,
+            prefer_nse=True  # Prefer NSE for delivery data
+        )
         
-        # For each sector date, create stock data with some variation
-        for sector_ts in reversed(sector_data):  # Start from oldest
-            ts_date = sector_ts.ts.date()
-            
-            # Check if already exists
-            if (stock.ticker, ts_date) in existing_set:
-                continue
-            
-            # Create stock data with variation from sector
-            # Add random variation: ±5% from sector price
-            variation = random.uniform(0.95, 1.05)
-            base_price = float(sector_ts.close)
-            
-            stock_ts = models.StockTimeSeries(
-                ticker=stock.ticker,
-                date=ts_date,
-                open=Decimal(base_price * variation * random.uniform(0.98, 1.02)),
-                high=Decimal(base_price * variation * random.uniform(1.00, 1.03)),
-                low=Decimal(base_price * variation * random.uniform(0.97, 1.00)),
-                close=Decimal(base_price * variation),
-                volume=int(sector_ts.volume * random.uniform(0.5, 2.0)),
-                deliverable_volume=int(sector_ts.volume * random.uniform(0.3, 0.7)),
-                turnover=Decimal(base_price * variation * sector_ts.volume * random.uniform(0.5, 2.0))
-            )
-            db.add(stock_ts)
-            existing_set.add((stock.ticker, ts_date))  # Track in memory
-            count += 1
-            
-            if count % 500 == 0:
-                db.commit()
-                logger.info(f"Created {count} stock time series records...")
+        if count > 0:
+            total_count += count
+            logger.info(f"✅ Fetched {count} records for {stock.ticker}")
+        else:
+            logger.warning(f"⚠️  No data fetched for {stock.ticker}")
+        
+        # Small delay to avoid rate limiting
+        import time
+        time.sleep(0.3)
     
-    db.commit()
-    logger.info(f"Created {count} stock time series records")
-    return count
+    logger.info(f"✅ Fetched {total_count} total stock time series records (real data only)")
+    return total_count
 
 
 def calculate_stock_market_caps(db: Session) -> int:
@@ -481,9 +452,10 @@ def main():
             logger.info("\n2. Creating stocks...")
             create_stocks_from_constituents(db)
         
-        # Step 3: Create stock time series
+        # Step 3: Fetch real stock time series data
         if not args.skip_timeseries:
-            logger.info("\n3. Creating stock time series...")
+            logger.info("\n3. Fetching real stock time series data...")
+            logger.info("   Using: NSE (nsepython) → Kite Connect → yfinance")
             create_stock_time_series_from_sector(db)
         
         # Step 4: Calculate market caps

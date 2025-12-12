@@ -216,11 +216,11 @@ export interface ApiResponse<T> {
 export const api = {
   getSectors: async (): Promise<SectorSummary[]> => {
     const response = await client.get('/api/v1/sectors');
-    // Handle both old format (array) and new format (object with sectors and metadata)
+    // Handle both old format (array) and new format (object with data/sectors and metadata)
     if (Array.isArray(response.data)) {
       return response.data;
     }
-    return response.data.sectors || [];
+    return response.data.data || response.data.sectors || [];
   },
 
   getSectorsWithMetadata: async (): Promise<ApiResponse<SectorSummary[]>> => {
@@ -234,19 +234,37 @@ export const api = {
         },
       };
     }
+    // Handle new format: { data: [...], metadata: {...} }
     return {
-      data: response.data.sectors || [],
+      data: response.data.data || response.data.sectors || [],
       metadata: response.data.metadata,
     };
   },
 
   getSectorForecast: async (sectorId: string): Promise<ForecastResponse> => {
-    const response = await client.get(`/api/v1/sectors/${sectorId}/forecast`);
-    // Handle both old format (ForecastResponse) and new format (object with forecast and metadata)
-    if (response.data.forecast) {
-      return response.data.forecast;
+    // Try the forecasts endpoint first, fallback to sectors endpoint for backward compatibility
+    try {
+      const response = await client.get(`/api/v1/forecasts/sectors/${sectorId}/forecast`, {
+        params: { _t: Date.now() } // Add timestamp to bypass cache
+      });
+      // Handle both old format (ForecastResponse) and new format (object with forecast and metadata)
+      if (response.data.forecast) {
+        return response.data.forecast;
+      }
+      return response.data;
+    } catch (error: any) {
+      // Fallback to old endpoint if new one doesn't exist
+      if (error.response?.status === 404) {
+        const response = await client.get(`/api/v1/sectors/${sectorId}/forecast`, {
+          params: { _t: Date.now() }
+        });
+        if (response.data.forecast) {
+          return response.data.forecast;
+        }
+        return response.data;
+      }
+      throw error;
     }
-    return response.data;
   },
 
   getSectorForecastWithMetadata: async (sectorId: string): Promise<ApiResponse<ForecastResponse>> => {
@@ -361,8 +379,22 @@ export const api = {
   },
 
   getQuarterOutlook: async (): Promise<QuarterOutlookResponse> => {
-    const response = await client.get('/api/v1/sectors/quarter-outlook');
-    return response.data;
+    // Try forecasts endpoint first, fallback to sectors endpoint
+    try {
+      const response = await client.get('/api/v1/forecasts/sectors/quarter-outlook', {
+        params: { _t: Date.now() }
+      });
+      return response.data;
+    } catch (error: any) {
+      // Fallback to sectors endpoint
+      if (error.response?.status === 404) {
+        const response = await client.get('/api/v1/sectors/quarter-outlook', {
+          params: { _t: Date.now() }
+        });
+        return response.data;
+      }
+      throw error;
+    }
   },
 
   // Sector Rotation APIs
@@ -525,6 +557,66 @@ export const api = {
   }> => {
     const response = await client.get('/api/v1/sector-screener/compare', {
       params: { sectors: sectors.join(','), limit },
+    });
+    return response.data;
+  },
+
+  // Live Data APIs (Kite Connect)
+  getLiveQuote: async (ticker: string): Promise<{
+    ticker: string;
+    instrument_token?: number;
+    last_price: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+    timestamp?: string;
+    net_change: number;
+    net_change_pct: number;
+    fetched_at: string;
+    is_live: boolean;
+    source: string;
+  }> => {
+    const response = await client.get(`/api/v1/live-quote/${ticker}`);
+    return response.data;
+  },
+
+  getLiveQuotes: async (tickers: string[]): Promise<{
+    quotes: Record<string, any>;
+    errors: string[];
+    fetched_at: string;
+    is_live: boolean;
+    source: string;
+  }> => {
+    const response = await client.get('/api/v1/live-quotes', {
+      params: { tickers: tickers.join(',') },
+    });
+    return response.data;
+  },
+
+  getIntradayData: async (
+    ticker: string,
+    interval: 'minute' | '3minute' | '5minute' | '15minute' | '30minute' | '60minute' = '5minute',
+    days: number = 1
+  ): Promise<{
+    ticker: string;
+    interval: string;
+    data: Array<{
+      date: string;
+      open: number;
+      high: number;
+      low: number;
+      close: number;
+      volume: number;
+    }>;
+    count: number;
+    fetched_at: string;
+    is_live: boolean;
+    source: string;
+  }> => {
+    const response = await client.get(`/api/v1/intraday/${ticker}`, {
+      params: { interval, days },
     });
     return response.data;
   },

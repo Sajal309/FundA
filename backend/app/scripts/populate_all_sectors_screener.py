@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from app.db import database, models
 from app.config.sector_screeners import SECTOR_SCREENERS, SECTOR_NAME_MAP
-from app.scripts.fetch_stock_fundamentals import create_mock_fundamentals, store_fundamentals
+from app.scripts.fetch_stock_fundamentals import fetch_fundamentals_for_stock
 from app.utils import logger
 
 
@@ -108,7 +108,7 @@ def create_stocks_for_sector(db, sector_key: str, sector_names: list, num_stocks
 
 
 def create_fundamentals_for_sector(db, sector_key: str, sector_names: list, as_of_date: date):
-    """Create fundamentals data for all stocks in a sector."""
+    """Fetch and store real fundamentals data for all stocks in a sector."""
     config = SECTOR_SCREENERS.get(sector_key)
     if not config:
         return 0
@@ -133,14 +133,17 @@ def create_fundamentals_for_sector(db, sector_key: str, sector_names: list, as_o
         if existing:
             continue
         
-        # Generate mock fundamentals
-        fundamentals = create_mock_fundamentals(stock.ticker, stock.sector_id)
-        
-        # Store fundamentals
-        if store_fundamentals(db, stock.ticker, fundamentals, as_of_date):
+        # Fetch real fundamentals (NSE → yfinance, no mock fallback)
+        if fetch_fundamentals_for_stock(db, stock.ticker, as_of_date):
             count += 1
+        else:
+            logger.warning(f"Could not fetch real fundamentals for {stock.ticker}")
+        
+        # Small delay to avoid rate limiting
+        import time
+        time.sleep(0.5)
     
-    logger.info(f"Created {count} fundamentals for {config.label} ({sector_key})")
+    logger.info(f"Fetched {count} real fundamentals for {config.label} ({sector_key})")
     return count
 
 

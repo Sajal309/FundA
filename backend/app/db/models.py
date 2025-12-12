@@ -610,7 +610,7 @@ class SectorVWAPSnapshot(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     sector_id = Column(String, nullable=False, index=True)
-    total_mcap = Column(Numeric(15, 2), nullable=True)  # Total market cap
+    total_mcap = Column(Numeric(20, 2), nullable=True)  # Total market cap (in rupees)
     pct_mcap_price_above_vwap = Column(Float, nullable=True)  # % of mcap where price > VWAP
     
     __table_args__ = (
@@ -625,7 +625,7 @@ class IndustryVWAPSnapshot(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     date = Column(Date, nullable=False, index=True)
     industry_id = Column(String, nullable=False, index=True)
-    total_mcap = Column(Numeric(15, 2), nullable=True)  # Total market cap
+    total_mcap = Column(Numeric(20, 2), nullable=True)  # Total market cap (in rupees)
     pct_mcap_price_above_vwap = Column(Float, nullable=True)  # % of mcap where price > VWAP
     
     __table_args__ = (

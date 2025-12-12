@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from 'react-query';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import HelpIcon from './HelpIcon';
 
 // Canonical sectors list
 const CANONICAL_SECTORS = [
@@ -61,7 +62,26 @@ function EarningsWatch() {
   if (isLoading) {
     return (
       <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
-        <h3 className="text-lg font-semibold mb-4 text-dark-100">Earnings Watch</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-lg font-semibold text-dark-100">Earnings Watch</h3>
+          <HelpIcon
+            title="Earnings Watch"
+            content={`This section tracks upcoming earnings announcements and revision trends.
+
+What it shows:
+• Upcoming Results: Stocks with earnings announcements in next 30 days
+• Revision Heatmap: % of stocks with EPS upgrades vs downgrades
+• Sector-wise breakdown of earnings activity
+
+What to infer:
+• High upgrade % = positive earnings momentum
+• High downgrade % = negative earnings trends
+• Upcoming results can cause volatility - plan accordingly
+• Sectors with more upgrades tend to outperform
+• Use this to identify sectors with improving fundamentals
+• Earnings revisions often precede price movements`}
+          />
+        </div>
         <div className="text-dark-400">Loading...</div>
       </div>
     );
@@ -70,7 +90,26 @@ function EarningsWatch() {
   if (!data) {
     return (
       <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
-        <h3 className="text-lg font-semibold mb-4 text-dark-100">Earnings Watch</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-lg font-semibold text-dark-100">Earnings Watch</h3>
+          <HelpIcon
+            title="Earnings Watch"
+            content={`This section tracks upcoming earnings announcements and revision trends.
+
+What it shows:
+• Upcoming Results: Stocks with earnings announcements in next 30 days
+• Revision Heatmap: % of stocks with EPS upgrades vs downgrades
+• Sector-wise breakdown of earnings activity
+
+What to infer:
+• High upgrade % = positive earnings momentum
+• High downgrade % = negative earnings trends
+• Upcoming results can cause volatility - plan accordingly
+• Sectors with more upgrades tend to outperform
+• Use this to identify sectors with improving fundamentals
+• Earnings revisions often precede price movements`}
+          />
+        </div>
         <div className="text-dark-400">No data available</div>
       </div>
     );
@@ -96,7 +135,26 @@ function EarningsWatch() {
   return (
     <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-dark-100">Earnings Watch</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-dark-100">Earnings Watch</h3>
+          <HelpIcon
+            title="Earnings Watch"
+            content={`This section tracks upcoming earnings announcements and revision trends.
+
+What it shows:
+• Upcoming Results: Stocks with earnings announcements in next 30 days
+• Revision Heatmap: % of stocks with EPS upgrades vs downgrades
+• Sector-wise breakdown of earnings activity
+
+What to infer:
+• High upgrade % = positive earnings momentum
+• High downgrade % = negative earnings trends
+• Upcoming results can cause volatility - plan accordingly
+• Sectors with more upgrades tend to outperform
+• Use this to identify sectors with improving fundamentals
+• Earnings revisions often precede price movements`}
+          />
+        </div>
         <span className="text-xs text-dark-400">As of {new Date(data.as_of).toLocaleDateString()}</span>
       </div>
 

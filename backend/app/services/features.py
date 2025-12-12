@@ -4,6 +4,7 @@ import numpy as np
 from datetime import date, timedelta
 from typing import Optional, Dict, Any
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 from app.db import crud, schemas, models
 from app.utils import logger
 from app.utils.formatting import round_to_2_decimal
@@ -160,8 +161,15 @@ def compute_features_for_sector(
     # Get the date for this feature set
     feature_date = target_date if target_date else df.index[-1].date()
     
-    # Get flows data for this sector and date
+    # Get flows data for this sector and date (use latest if exact date not found)
     sector_flows = crud.get_sector_flows_daily(db, sector_id, feature_date)
+    if not sector_flows:
+        # Try to get latest available flows data
+        latest_flows = db.query(models.SectorFlowsDaily).filter(
+            models.SectorFlowsDaily.sector_id == sector_id,
+            models.SectorFlowsDaily.date <= feature_date
+        ).order_by(desc(models.SectorFlowsDaily.date)).first()
+        sector_flows = latest_flows
     fii_net_inr = sector_flows.fii_net_inr if sector_flows else None
     
     # Get macro data for this date
@@ -223,8 +231,15 @@ def compute_features_for_sector(
     oi_change_3d = options_data.oi_change_3d if options_data else None
     iv_index = options_data.iv_index if options_data else None
     
-    # Get sentiment data for this sector and date
+    # Get sentiment data for this sector and date (use latest if exact date not found)
     sector_sentiment = crud.get_sector_sentiment_daily(db, sector_id, feature_date)
+    if not sector_sentiment:
+        # Try to get latest available sentiment data
+        latest_sentiment = db.query(models.SectorSentimentDaily).filter(
+            models.SectorSentimentDaily.sector_id == sector_id,
+            models.SectorSentimentDaily.date <= feature_date
+        ).order_by(desc(models.SectorSentimentDaily.date)).first()
+        sector_sentiment = latest_sentiment
     sentiment_score_1d = sector_sentiment.sentiment_score_1d if sector_sentiment else None
     sentiment_score_7d = sector_sentiment.sentiment_score_7d if sector_sentiment else None
     

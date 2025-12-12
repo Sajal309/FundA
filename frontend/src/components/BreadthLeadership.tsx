@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { useQuery } from 'react-query';
 import { api } from '../api/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import HelpIcon from './HelpIcon';
 
 // Canonical sectors list
 const CANONICAL_SECTORS = [
@@ -34,15 +35,18 @@ function BreadthLeadership() {
   const { data, isLoading } = useQuery<BreadthResponse>(
     'breadth',
     async () => {
-      // Use relative URL to go through Vite proxy
-      const apiUrl = import.meta.env.VITE_API_URL && !import.meta.env.VITE_API_URL.includes('localhost')
-        ? import.meta.env.VITE_API_URL
-        : '';
-      const response = await fetch(`${apiUrl}/api/v1/breadth`);
-      if (!response.ok) throw new Error('Failed to fetch breadth data');
-      return response.json();
+      // Import axios client directly
+      const { default: axios } = await import('axios');
+      const apiUrl = import.meta.env.VITE_API_URL || '';
+      const response = await axios.get(`${apiUrl}/api/v1/breadth`, {
+        params: { _t: Date.now() } // Add timestamp to bypass cache
+      });
+      return response.data;
     },
-    { refetchInterval: 300000 }
+    { 
+      refetchInterval: 300000, // Refetch every 5 minutes
+      staleTime: 60000, // Consider data stale after 1 minute
+    }
   );
 
   // Filter to canonical sectors only - must be called before early returns
@@ -94,7 +98,26 @@ function BreadthLeadership() {
   return (
     <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-dark-100">Breadth & Leadership</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold text-dark-100">Breadth & Leadership</h3>
+          <HelpIcon
+            title="Breadth & Leadership"
+            content={`This section shows market breadth metrics, indicating how many stocks in each sector are participating in the trend.
+
+What it shows:
+• Above 50DMA: % of stocks trading above their 50-day moving average
+• Above 200DMA: % of stocks above their 200-day moving average (long-term trend)
+• 3M Highs: % of stocks making 3-month highs
+• 3M Lows: % of stocks making 3-month lows
+
+What to infer:
+• Broad participation (≥70% green) = healthy, sustainable trends
+• Narrow participation (<30% red) = weak trends, potential reversal risk
+• High 3M highs + low 3M lows = strong momentum
+• Use breadth to confirm sector strength - broad moves are more reliable
+• Low breadth despite price gains suggests limited participation and potential weakness`}
+          />
+        </div>
         <span className="text-xs text-dark-400">As of {new Date(data.as_of).toLocaleDateString()}</span>
       </div>
 

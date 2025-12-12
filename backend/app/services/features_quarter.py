@@ -141,24 +141,37 @@ def compute_breadth_features(
     
     if breadth_data and breadth_data.total_constituents and breadth_data.total_constituents > 0:
         breadth_above_50dma = float(breadth_data.above_50dma) / breadth_data.total_constituents
-        breadth_3m_highs = float(breadth_data.making_3m_highs) / breadth_data.total_constituents
+        breadth_3m_highs = float(breadth_data.making_3m_highs) / breadth_data.total_constituents if breadth_data.making_3m_highs else None
     else:
-        # Fallback: compute from constituents if we have time series data
-        constituents = db.query(models.SectorConstituent).filter(
-            models.SectorConstituent.sector_id == sector_id
-        ).all()
+        # Fallback 1: Try to compute from SectorBreadthSnapshot
+        from sqlalchemy import desc
+        snapshot = db.query(models.SectorBreadthSnapshot).filter(
+            and_(
+                models.SectorBreadthSnapshot.sector_id == sector_id,
+                models.SectorBreadthSnapshot.date <= target_date
+            )
+        ).order_by(desc(models.SectorBreadthSnapshot.date)).first()
         
-        if not constituents:
-            return {
-                "breadth_above_50dma": None,
-                "breadth_3m_highs": None,
-            }
-        
-        # For each constituent, check if we have price data above 50DMA
-        # This is simplified - in production, you'd fetch individual stock prices
-        # For now, return None if breadth_daily doesn't exist
-        breadth_above_50dma = None
-        breadth_3m_highs = None
+        if snapshot and snapshot.pct_count_above_sma50 is not None:
+            breadth_above_50dma = float(snapshot.pct_count_above_sma50)
+            breadth_3m_highs = None  # Not available in snapshot
+        else:
+            # Fallback 2: Compute from stock technical indicators
+            from app.services import populate_forecast_data
+            try:
+                breadth_daily = populate_forecast_data.improve_breadth_calculation_from_stocks(
+                    db, sector_id, target_date
+                )
+                if breadth_daily and breadth_daily.total_constituents and breadth_daily.total_constituents > 0:
+                    breadth_above_50dma = float(breadth_daily.above_50dma) / breadth_daily.total_constituents
+                    breadth_3m_highs = float(breadth_daily.making_3m_highs) / breadth_daily.total_constituents if breadth_daily.making_3m_highs else None
+                else:
+                    breadth_above_50dma = None
+                    breadth_3m_highs = None
+            except Exception as e:
+                logger.debug(f"Could not compute breadth from stocks for {sector_id}: {e}")
+                breadth_above_50dma = None
+                breadth_3m_highs = None
     
     return {
         "breadth_above_50dma": breadth_above_50dma,
@@ -255,6 +268,20 @@ def compute_valuation_features(
             models.SectorValuationsDaily.date == target_date
         )
     ).first()
+    
+    if not valuation or not valuation.pe:
+        # Fallback: Calculate from stocks
+        from app.services import populate_forecast_data
+        try:
+            valuation = populate_forecast_data.calculate_sector_valuations_from_stocks(
+                db, sector_id, target_date
+            )
+        except Exception as e:
+            logger.debug(f"Could not calculate valuation from stocks for {sector_id}: {e}")
+            return {
+                "valuation_pe": None,
+                "valuation_pe_percentile": None,
+            }
     
     if not valuation or not valuation.pe:
         return {

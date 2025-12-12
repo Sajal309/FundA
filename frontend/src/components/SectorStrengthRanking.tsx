@@ -1,5 +1,6 @@
 import { useQuery } from 'react-query';
 import { api } from '../api/client';
+import HelpIcon from './HelpIcon';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 
 interface SectorStrengthRankingProps {
@@ -16,7 +17,25 @@ function SectorStrengthRanking({ lookbackDays = 30 }: SectorStrengthRankingProps
   if (isLoading) {
     return (
       <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
-        <h3 className="text-lg font-semibold mb-4 text-dark-100">Sector Strength Ranking</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-lg font-semibold text-dark-100">Sector Strength Ranking</h3>
+          <HelpIcon
+            title="Sector Strength Ranking"
+            content={`This section ranks sectors by their relative strength over a specified lookback period.
+
+What it shows:
+• Relative performance compared to the market (Nifty 50)
+• Strength score based on momentum and price action
+• Ranking from strongest to weakest sectors
+
+What to infer:
+• Top-ranked sectors show strong relative momentum
+• Use this to identify sectors outperforming the market
+• Combine with breadth metrics to confirm strength
+• Rotate into stronger sectors, avoid weak ones
+• Strength rankings help identify sector rotation opportunities`}
+          />
+        </div>
         <div className="text-dark-400">Loading...</div>
       </div>
     );
@@ -25,7 +44,25 @@ function SectorStrengthRanking({ lookbackDays = 30 }: SectorStrengthRankingProps
   if (!data || !data.rankings || data.rankings.length === 0) {
     return (
       <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
-        <h3 className="text-lg font-semibold mb-4 text-dark-100">Sector Strength Ranking</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-lg font-semibold text-dark-100">Sector Strength Ranking</h3>
+          <HelpIcon
+            title="Sector Strength Ranking"
+            content={`This section ranks sectors by their relative strength over a specified lookback period.
+
+What it shows:
+• Relative performance compared to the market (Nifty 50)
+• Strength score based on momentum and price action
+• Ranking from strongest to weakest sectors
+
+What to infer:
+• Top-ranked sectors show strong relative momentum
+• Use this to identify sectors outperforming the market
+• Combine with breadth metrics to confirm strength
+• Rotate into stronger sectors, avoid weak ones
+• Strength rankings help identify sector rotation opportunities`}
+          />
+        </div>
         <div className="text-dark-400">No data available</div>
       </div>
     );
@@ -48,7 +85,25 @@ function SectorStrengthRanking({ lookbackDays = 30 }: SectorStrengthRankingProps
 
   return (
     <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
-      <h3 className="text-lg font-semibold mb-4 text-dark-100">Sector Strength Ranking ({lookbackDays} days)</h3>
+      <div className="flex items-center gap-2 mb-4">
+        <h3 className="text-lg font-semibold text-dark-100">Sector Strength Ranking ({lookbackDays} days)</h3>
+        <HelpIcon
+          title="Sector Strength Ranking"
+          content={`This section ranks sectors by their relative strength over a specified lookback period.
+
+What it shows:
+• Relative performance compared to the market (Nifty 50)
+• Strength score based on momentum and price action
+• Ranking from strongest to weakest sectors
+
+What to infer:
+• Top-ranked sectors show strong relative momentum
+• Use this to identify sectors outperforming the market
+• Combine with breadth metrics to confirm strength
+• Rotate into stronger sectors, avoid weak ones
+• Strength rankings help identify sector rotation opportunities`}
+        />
+      </div>
       
       {/* Top 5 Sectors */}
       <div className="mb-6">

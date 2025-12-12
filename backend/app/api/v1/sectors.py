@@ -162,12 +162,17 @@ def get_sectors(db: Session = Depends(database.get_db)) -> Dict[str, Any]:
     # Sort by name for better UX
     result.sort(key=lambda x: x.name)
     
+    # Check if Kite Connect is available (indicates live data capability)
+    from app.services import fetch_real_stocks
+    kite_available = fetch_real_stocks.get_kite_client() is not None
+    
     return {
-        "sectors": result,
+        "data": result,
         "metadata": {
             "last_updated": last_updated,
             "fetched_at": datetime.utcnow().isoformat(),
-            "is_live": False,  # Market data is typically end-of-day
+            "is_live": kite_available,  # True if Kite Connect is configured (live data available)
+            "source": "Kite Connect (live)" if kite_available else "yfinance (EOD)",
             "count": len(result)
         }
     }
@@ -242,7 +247,7 @@ def get_breadth(
                 "name": SECTOR_NAMES.get(sector_id, sector_id),
                 "above_50dma_pct": float(breadth_data.above_50dma) / breadth_data.total_constituents,
                 "above_200dma_pct": float(breadth_data.above_200dma) / breadth_data.total_constituents if breadth_data.above_200dma else None,
-                "highs_3m_pct": float(breadth_data.making_3m_highs) / breadth_data.total_constituents,
+                "highs_3m_pct": float(breadth_data.making_3m_highs) / breadth_data.total_constituents if breadth_data.making_3m_highs is not None else 0.0,
                 "lows_3m_pct": float(breadth_data.making_3m_lows) / breadth_data.total_constituents if breadth_data.making_3m_lows else None,
             })
         else:

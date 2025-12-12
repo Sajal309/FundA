@@ -33,9 +33,21 @@ def main():
         
         # Step 1: Fetch stock data
         if not args.skip_fetch:
-            logger.info("\n1. Fetching real stock data from yfinance...")
+            # Check available data sources
+            from app.services import nsepython_service
+            nse_available = nsepython_service.is_available()
+            kite_available = fetch_real_stocks.get_kite_client() is not None
+            
+            if nse_available:
+                logger.info("\n1. Fetching real stock data from NSE (nsepython) - PRIMARY source for delivery data...")
+            elif kite_available:
+                logger.info("\n1. Fetching real stock data from Kite Connect (live/intraday)...")
+            else:
+                logger.info("\n1. Fetching real stock data from yfinance (EOD)...")
+                logger.info("   💡 Tip: Install nsepythonserver for accurate delivery data")
+            
             if args.sector:
-                count = fetch_real_stocks.fetch_all_sector_stocks(db, args.sector, args.days)
+                count = fetch_real_stocks.fetch_all_sector_stocks(db, args.sector, args.days, prefer_nse=True)
                 logger.info(f"✅ Fetched {count} records for {args.sector}")
             else:
                 results = fetch_real_stocks.fetch_all_stocks_data(db, args.days)

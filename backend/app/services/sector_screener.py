@@ -337,21 +337,120 @@ def screen_stocks(
     results = query.limit(limit).all()
     
     # Get latest stock prices for CMP and 52w % calculation
-    from datetime import timedelta
+    from datetime import timedelta, datetime
     tickers = [stock.ticker for _, stock in results]
     
     # Get latest prices for each ticker
+    # First try from StockTimeSeries, then fallback to live quotes if stale
     latest_prices = {}
+    tickers_needing_live_quotes = []
+    
+    today = date.today()
     for ticker in tickers:
         latest_ts = db.query(models.StockTimeSeries).filter(
             models.StockTimeSeries.ticker == ticker
         ).order_by(desc(models.StockTimeSeries.date)).first()
         
         if latest_ts:
-            latest_prices[ticker] = {
-                'close': float(latest_ts.close),
-                'date': latest_ts.date
-            }
+            # Check if data is stale (older than 1 day)
+            days_old = (today - latest_ts.date).days
+            if days_old <= 1:
+                # Use StockTimeSeries data if recent
+                latest_prices[ticker] = {
+                    'close': float(latest_ts.close),
+                    'date': latest_ts.date,
+                    'source': 'database'
+                }
+            else:
+                # Data is stale, fetch live quote
+                tickers_needing_live_quotes.append(ticker)
+        else:
+            # No data in database, fetch live quote
+            tickers_needing_live_quotes.append(ticker)
+    
+    # Fetch live quotes for stocks with stale/missing data
+    if tickers_needing_live_quotes:
+        logger.info(f"Fetching live quotes for {len(tickers_needing_live_quotes)} stocks with stale/missing data")
+        
+        # Try NSE first (nsepython) - can provide price, market cap, volume, etc.
+        from app.services import nsepython_service
+        if nsepython_service.is_available():
+            for ticker in tickers_needing_live_quotes:
+                try:
+                    quote = nsepython_service.fetch_stock_quote(ticker)
+                    if quote and isinstance(quote, dict):
+                        # Extract price and other data from NSE quote
+                        price_info = quote.get('priceInfo', {})
+                        security_info = quote.get('securityInfo', {})
+                        info = quote.get('info', {})
+                        
+                        # Try multiple locations for last price
+                        last_price = (
+                            price_info.get('lastPrice') or 
+                            price_info.get('lastTradedPrice') or
+                            security_info.get('lastPrice') or
+                            info.get('lastPrice')
+                        )
+                        
+                        if last_price:
+                            quote_data = {
+                                'close': float(last_price),
+                                'date': today,
+                                'source': 'nse_live'
+                            }
+                            
+                            # Extract market cap if available
+                            market_cap = (
+                                price_info.get('totalTradedValue') or
+                                price_info.get('marketCap') or
+                                price_info.get('ffmc') or  # Free float market cap
+                                security_info.get('marketCap') or
+                                info.get('marketCap')
+                            )
+                            if market_cap:
+                                quote_data['market_cap'] = float(market_cap) / 10000000  # Convert to crores
+                            
+                            # Extract volume if available
+                            volume = (
+                                price_info.get('totalTradedVolume') or
+                                info.get('totalTradedVolume')
+                            )
+                            if volume:
+                                quote_data['volume'] = int(volume)
+                            
+                            latest_prices[ticker] = quote_data
+                            continue
+                except Exception as e:
+                    logger.debug(f"Could not fetch NSE quote for {ticker}: {e}")
+        
+        # Fallback to Kite Connect for remaining stocks - can provide price, volume
+        from app.services import fetch_real_stocks
+        kite = fetch_real_stocks.get_kite_client()
+        if kite:
+            for ticker in tickers_needing_live_quotes:
+                if ticker in latest_prices:
+                    continue  # Already got from NSE
+                try:
+                    quote = fetch_real_stocks.fetch_live_quote_from_kite(ticker, kite)
+                    if quote and quote.get('last_price'):
+                        quote_data = {
+                            'close': float(quote['last_price']),
+                            'date': today,
+                            'source': 'kite_live'
+                        }
+                        
+                        # Extract volume if available
+                        if quote.get('volume'):
+                            quote_data['volume'] = int(quote['volume'])
+                        
+                        latest_prices[ticker] = quote_data
+                except Exception as e:
+                    logger.debug(f"Could not fetch Kite quote for {ticker}: {e}")
+        
+        # Log which stocks still don't have prices
+        missing = [t for t in tickers_needing_live_quotes if t not in latest_prices]
+        if missing:
+            logger.warning(f"Could not fetch live quotes for {len(missing)} stocks: {missing[:5]}")
     
     # Get 52-week prices (approximately 252 trading days ago)
     year_ago_date = latest_date - timedelta(days=365)
@@ -377,9 +476,20 @@ def screen_stocks(
             "name": stock.company_name,
         }
         
-        # Add CMP (Current Market Price) from latest StockTimeSeries
+        # Add CMP (Current Market Price) - from live quotes or latest StockTimeSeries
         if stock.ticker in latest_prices:
-            row["cmp"] = round(latest_prices[stock.ticker]['close'], 2)
+            price_data = latest_prices[stock.ticker]
+            row["cmp"] = round(price_data['close'], 2)
+            
+            # Update market cap if available from quote or calculate from live price
+            if "market_cap" in price_data:
+                # Market cap from quote (already in crores)
+                row["market_cap"] = round(price_data['market_cap'], 2)
+            elif stock.shares_outstanding and not row.get("market_cap"):
+                # Calculate market cap from live price and shares outstanding
+                market_cap_rs = price_data['close'] * stock.shares_outstanding
+                market_cap_cr = market_cap_rs / 10000000  # Convert to crores
+                row["market_cap"] = round(market_cap_cr, 2)
         else:
             row["cmp"] = None
         
@@ -425,6 +535,7 @@ def screen_stocks(
         # These fields are always added to the response, even if not in sector-specific config
         
         # Market cap (ensure it's there, convert to crores if needed)
+        # Priority: live quote market cap > config > fundamentals > calculated from price
         # Map both marketCap (from config) and market_cap (standardized)
         if "market_cap" not in row:
             # Try to get from marketCap first (from config columns)
@@ -433,6 +544,11 @@ def screen_stocks(
                 mcap_value = row["marketCap"]
             elif fund.market_cap:
                 mcap_value = fund.market_cap
+            # Also check if we got it from live quote (already in crores)
+            elif stock.ticker in latest_prices and "market_cap" in latest_prices[stock.ticker]:
+                # Market cap from live quote is already in crores
+                row["market_cap"] = round(latest_prices[stock.ticker]['market_cap'], 2)
+                mcap_value = None  # Skip further processing
             
             if mcap_value is not None:
                 # Convert to float for comparison (handles Decimal, int, float)
@@ -442,7 +558,13 @@ def screen_stocks(
                     row["market_cap"] = round(mcap_float / 10000000, 2)
                 else:
                     row["market_cap"] = round(mcap_float, 2)
-            else:
+            elif stock.ticker in latest_prices and stock.shares_outstanding and "market_cap" not in row:
+                # Last resort: calculate from live price if we have it and shares outstanding
+                live_price = latest_prices[stock.ticker]['close']
+                market_cap_rs = live_price * stock.shares_outstanding
+                market_cap_cr = market_cap_rs / 10000000  # Convert to crores
+                row["market_cap"] = round(market_cap_cr, 2)
+            elif "market_cap" not in row:
                 row["market_cap"] = None
         
         # PE ratio

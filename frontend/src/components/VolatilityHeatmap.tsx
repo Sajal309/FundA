@@ -1,5 +1,6 @@
 import { useQuery } from 'react-query';
 import { api } from '../api/client';
+import HelpIcon from './HelpIcon';
 import { useState, useEffect, useMemo } from 'react';
 
 // Canonical sectors list
@@ -22,8 +23,8 @@ interface VolatilityHeatmapProps {
 function VolatilityHeatmap({ lookbackDays = 30 }: VolatilityHeatmapProps) {
   const { data: sectorsResponse } = useQuery('sectors', api.getSectors, { refetchInterval: 300000 });
   
-  // Handle both array response and object response with metadata
-  const sectors = Array.isArray(sectorsResponse) ? sectorsResponse : (sectorsResponse?.sectors || []);
+  // getSectors already handles the response format and returns an array
+  const sectors = Array.isArray(sectorsResponse) ? sectorsResponse : [];
   
   // Filter to canonical sectors only
   const canonicalSectors = useMemo(() => {
@@ -85,7 +86,26 @@ function VolatilityHeatmap({ lookbackDays = 30 }: VolatilityHeatmapProps) {
   if (isLoading) {
     return (
       <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
-        <h3 className="text-lg font-semibold mb-4 text-dark-100">Volatility Heatmap ({lookbackDays} days)</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-lg font-semibold text-dark-100">Volatility Heatmap ({lookbackDays} days)</h3>
+          <HelpIcon
+            title="Volatility Heatmap"
+            content={`This heatmap visualizes volatility levels across different sectors.
+
+What it shows:
+• Color-coded volatility levels (green = low, red = high)
+• Relative volatility compared to historical averages
+• Sector-by-sector volatility comparison
+
+What to infer:
+• Low volatility (green) = stable, predictable price action
+• High volatility (red) = increased uncertainty, larger price swings
+• Use volatility to assess risk levels for each sector
+• High volatility can indicate both opportunity and risk
+• Combine with other metrics - high volatility + negative sentiment = caution
+• Low volatility + positive breadth = stable uptrends`}
+          />
+        </div>
         <div className="text-dark-400">Loading...</div>
       </div>
     );
@@ -94,7 +114,26 @@ function VolatilityHeatmap({ lookbackDays = 30 }: VolatilityHeatmapProps) {
   if (volatilityData.length === 0) {
     return (
       <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
-        <h3 className="text-lg font-semibold mb-4 text-dark-100">Volatility Heatmap</h3>
+        <div className="flex items-center gap-2 mb-4">
+          <h3 className="text-lg font-semibold text-dark-100">Volatility Heatmap</h3>
+          <HelpIcon
+            title="Volatility Heatmap"
+            content={`This heatmap visualizes volatility levels across different sectors.
+
+What it shows:
+• Color-coded volatility levels (green = low, red = high)
+• Relative volatility compared to historical averages
+• Sector-by-sector volatility comparison
+
+What to infer:
+• Low volatility (green) = stable, predictable price action
+• High volatility (red) = increased uncertainty, larger price swings
+• Use volatility to assess risk levels for each sector
+• High volatility can indicate both opportunity and risk
+• Combine with other metrics - high volatility + negative sentiment = caution
+• Low volatility + positive breadth = stable uptrends`}
+          />
+        </div>
         <div className="text-dark-400">No data available</div>
       </div>
     );
@@ -116,7 +155,26 @@ function VolatilityHeatmap({ lookbackDays = 30 }: VolatilityHeatmapProps) {
 
   return (
     <div className="bg-dark-800 rounded-lg shadow-lg p-6 border border-dark-700">
-      <h3 className="text-lg font-semibold mb-4 text-dark-100">Volatility Heatmap ({lookbackDays} days)</h3>
+      <div className="flex items-center gap-2 mb-4">
+        <h3 className="text-lg font-semibold text-dark-100">Volatility Heatmap ({lookbackDays} days)</h3>
+        <HelpIcon
+          title="Volatility Heatmap"
+          content={`This heatmap visualizes volatility levels across different sectors.
+
+What it shows:
+• Color-coded volatility levels (green = low, red = high)
+• Relative volatility compared to historical averages
+• Sector-by-sector volatility comparison
+
+What to infer:
+• Low volatility (green) = stable, predictable price action
+• High volatility (red) = increased uncertainty, larger price swings
+• Use volatility to assess risk levels for each sector
+• High volatility can indicate both opportunity and risk
+• Combine with other metrics - high volatility + negative sentiment = caution
+• Low volatility + positive breadth = stable uptrends`}
+        />
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {volatilityData.map((item) => {
           const category = getVolatilityCategory(item.volatility);

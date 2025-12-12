@@ -9,7 +9,8 @@ import csv
 import io
 from app.db import database, models
 from app.config.sector_screeners import SECTOR_SCREENERS
-from app.services import sector_screener
+from app.config.ranking_config import SECTOR_RANKING_CONFIGS, get_ranking_config
+from app.services import sector_screener, ranking_service
 from app.utils import logger
 
 router = APIRouter()
@@ -19,14 +20,90 @@ router = APIRouter()
 def get_sector_screener(
     sector: str = Query(..., description="Sector key (e.g., 'banks', 'it', 'pharma')"),
     limit: int = Query(100, description="Maximum number of results"),
+    sort_by: Optional[str] = Query(None, description="Field to sort by (defaults to score/ranking)"),
     db: Session = Depends(database.get_db)
 ) -> Dict[str, Any]:
     """
     Get screened stocks for a given sector.
     
-    Returns stocks matching sector-specific criteria, sorted by sector-specific metrics.
+    Returns stocks sorted by ranking score by default (best to worst).
+    If a ranking config exists for the sector, uses weighted scoring.
+    Otherwise, falls back to sector-specific sorting.
     """
-    # Validate sector key
+    sector_lower = sector.lower()
+    
+    # Check if we have a ranking config for this sector - use ranking service
+    if sector_lower in SECTOR_RANKING_CONFIGS:
+        try:
+            result = ranking_service.compute_sector_ranked_stocks(
+                db=db,
+                sector_key=sector_lower,
+                limit=limit,
+                sort_by=sort_by  # Defaults to None, which means sort by score
+            )
+            
+            config = get_ranking_config(sector_lower)
+            
+            # Get latest data timestamp
+            latest_fundamentals = db.query(func.max(models.StockFundamentals.date)).scalar()
+            latest_timeseries = db.query(func.max(models.StockTimeSeries.date)).scalar()
+            
+            last_updated = None
+            if latest_fundamentals:
+                last_updated = latest_fundamentals.isoformat()
+            elif latest_timeseries:
+                last_updated = latest_timeseries.isoformat()
+            
+            # Check if Kite Connect is available
+            from app.services import fetch_real_stocks
+            kite_available = fetch_real_stocks.get_kite_client() is not None
+            
+            # Format columns for response
+            # Handle both dataclass ColumnConfig objects and dicts
+            columns = []
+            for col in result["columns"]:
+                if hasattr(col, 'field'):
+                    # It's a ColumnConfig dataclass
+                    columns.append({
+                        "field": col.field,
+                        "label": col.label,
+                        "tooltip": getattr(col, 'tooltip', None)
+                    })
+                elif isinstance(col, dict):
+                    # It's already a dict
+                    columns.append(col)
+                else:
+                    # Fallback: try to access as dict
+                    columns.append({
+                        "field": col.get("field") if isinstance(col, dict) else getattr(col, "field", ""),
+                        "label": col.get("label") if isinstance(col, dict) else getattr(col, "label", ""),
+                        "tooltip": col.get("tooltip") if isinstance(col, dict) else getattr(col, "tooltip", None)
+                    })
+            
+            return {
+                "sector": sector_lower,
+                "label": config.label,
+                "columns": columns,
+                "rows": result["rows"],
+                "count": len(result["rows"]),
+                "primarySort": {
+                    "field": "score",  # Default to score
+                    "direction": "desc"
+                },
+                "secondarySort": None,
+                "metadata": {
+                    "last_updated": last_updated,
+                    "fetched_at": datetime.utcnow().isoformat(),
+                    "is_live": kite_available,
+                    "source": "Kite Connect (live)" if kite_available else "yfinance (EOD)",
+                    "sorted_by": sort_by or "score",  # Indicate what we sorted by
+                }
+            }
+        except Exception as e:
+            logger.error(f"Error computing ranked stocks for {sector}: {e}")
+            # Fall through to old screener logic
+    
+    # Fallback to old screener logic for sectors without ranking config
     if sector not in SECTOR_SCREENERS:
         raise HTTPException(
             status_code=400,
@@ -51,6 +128,10 @@ def get_sector_screener(
         last_updated = latest_fundamentals.isoformat()
     elif latest_timeseries:
         last_updated = latest_timeseries.isoformat()
+    
+    # Check if Kite Connect is available (indicates live data capability)
+    from app.services import fetch_real_stocks
+    kite_available = fetch_real_stocks.get_kite_client() is not None
     
     # Format columns for response
     columns = [
@@ -79,8 +160,54 @@ def get_sector_screener(
         "metadata": {
             "last_updated": last_updated,
             "fetched_at": datetime.utcnow().isoformat(),
-            "is_live": False,  # Screener data is from database, not live
+            "is_live": kite_available,  # True if Kite Connect is configured (live data available)
+            "source": "Kite Connect (live)" if kite_available else "yfinance (EOD)",
         }
+    }
+
+
+@router.get("/sector-screener/ranked")
+def get_ranked_sector_screener(
+    sector: str = Query(..., description="Sector key (e.g., 'it', 'fmcg', 'pharma')"),
+    limit: Optional[int] = Query(100, description="Maximum number of stocks to return"),
+    sort_by: Optional[str] = Query(None, description="Field to sort by (defaults to score)"),
+    db: Session = Depends(database.get_db)
+):
+    """
+    Get ranked stocks for a sector based on weighted metrics.
+    
+    Returns stocks sorted by computed score (best to worst) with rank included.
+    Uses sector-specific weight configurations for scoring.
+    """
+    # Validate sector key
+    sector_lower = sector.lower()
+    if sector_lower not in SECTOR_RANKING_CONFIGS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid sector key: {sector}. Available sectors: {list(SECTOR_RANKING_CONFIGS.keys())}"
+        )
+    
+    # Get ranked stocks
+    try:
+        result = ranking_service.compute_sector_ranked_stocks(
+            db=db,
+            sector_key=sector_lower,
+            limit=limit,
+            sort_by=sort_by
+        )
+    except Exception as e:
+        logger.error(f"Error computing ranked stocks for {sector}: {e}")
+        raise HTTPException(status_code=500, detail=f"Error computing ranked stocks: {str(e)}")
+    
+    config = get_ranking_config(sector_lower)
+    
+    return {
+        "status": "ok",
+        "sector": sector_lower,
+        "label": config.label,
+        "columns": result["columns"],
+        "rows": result["rows"],
+        "meta": result["meta"]
     }
 
 
