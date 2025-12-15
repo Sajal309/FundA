@@ -4,7 +4,8 @@ import { api } from '../api/client';
 function MarketSummary() {
   const { data: flows } = useQuery(
     'market-flows',
-    () => api.getFlowsAnalysis(undefined, 7),
+    // Use a longer lookback so we always have some data, but display ONLY the latest day's change
+    () => api.getFlowsAnalysis(undefined, 30),
     { refetchInterval: 300000 }
   );
 
@@ -13,6 +14,22 @@ function MarketSummary() {
     () => api.getSectorCorrelations(30),
     { refetchInterval: 300000 }
   );
+
+  // Latest daily FII/DII net flows (₹ Cr), not cumulative traded amount
+  let latestFiiCr: string | null = null;
+  let latestDiiCr: string | null = null;
+
+  if (flows?.flows_by_date && Object.keys(flows.flows_by_date).length > 0) {
+    const sortedDates = Object.keys(flows.flows_by_date).sort();
+    const latestDateKey = sortedDates[sortedDates.length - 1];
+    const latest = flows.flows_by_date[latestDateKey];
+
+    if (latest) {
+      // Convert from INR to Crores (1 Cr = 10^7)
+      latestFiiCr = (latest.fii / 1e7).toFixed(2);
+      latestDiiCr = (latest.dii / 1e7).toFixed(2);
+    }
+  }
 
   // Calculate average correlation
   const avgCorrelation = correlations?.correlations
@@ -25,11 +42,11 @@ function MarketSummary() {
       <h3 className="text-xl font-bold mb-4">Market Summary</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <div className="text-sm opacity-90 mb-1">FII Flows (7d)</div>
+          <div className="text-sm opacity-90 mb-1">FII Flows (latest day)</div>
           <div className="text-2xl font-bold">
-            {flows ? (
-              <span className={flows.total_fii_net >= 0 ? 'text-green-300' : 'text-red-300'}>
-                ₹{(flows.total_fii_net / 1000000).toFixed(2)} Cr
+            {latestFiiCr !== null ? (
+              <span={parseFloat(latestFiiCr) >= 0 ? 'text-green-300' : 'text-red-300'}>
+                ₹{latestFiiCr} Cr
               </span>
             ) : (
               'N/A'
@@ -37,11 +54,11 @@ function MarketSummary() {
           </div>
         </div>
         <div>
-          <div className="text-sm opacity-90 mb-1">DII Flows (7d)</div>
+          <div className="text-sm opacity-90 mb-1">DII Flows (latest day)</div>
           <div className="text-2xl font-bold">
-            {flows ? (
-              <span className={flows.total_dii_net >= 0 ? 'text-green-300' : 'text-red-300'}>
-                ₹{(flows.total_dii_net / 1000000).toFixed(2)} Cr
+            {latestDiiCr !== null ? (
+              <span={parseFloat(latestDiiCr) >= 0 ? 'text-green-300' : 'text-red-300'}>
+                ₹{latestDiiCr} Cr
               </span>
             ) : (
               'N/A'
