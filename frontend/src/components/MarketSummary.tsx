@@ -4,7 +4,8 @@ import { api } from '../api/client';
 function MarketSummary() {
   const { data: flows } = useQuery(
     'market-flows',
-    // Use a longer lookback so we always have some data, but display ONLY the latest day's change
+    // Analyze a wider window of flows so we still have data even if the last few days are missing
+    // We'll compute the last 7 available days on the client
     () => api.getFlowsAnalysis(undefined, 30),
     { refetchInterval: 300000 }
   );
@@ -15,20 +16,28 @@ function MarketSummary() {
     { refetchInterval: 300000 }
   );
 
-  // Latest daily FII/DII net flows (₹ Cr), not cumulative traded amount
-  let latestFiiCr: string | null = null;
-  let latestDiiCr: string | null = null;
+  // Aggregate FII/DII net flows for the last 7 AVAILABLE days (₹ Cr), not total traded amount
+  let fii7dCr: string | null = null;
+  let dii7dCr: string | null = null;
 
   if (flows?.flows_by_date && Object.keys(flows.flows_by_date).length > 0) {
-    const sortedDates = Object.keys(flows.flows_by_date).sort();
-    const latestDateKey = sortedDates[sortedDates.length - 1];
-    const latest = flows.flows_by_date[latestDateKey];
+    // Sort dates descending and take the latest 7 entries that actually have data
+    const sortedEntries = Object.entries(flows.flows_by_date)
+      .sort(([d1], [d2]) => (d1 < d2 ? 1 : d1 > d2 ? -1 : 0))
+      .slice(0, 7);
 
-    if (latest) {
-      // Convert from INR to Crores (1 Cr = 10^7)
-      latestFiiCr = (latest.fii / 1e7).toFixed(2);
-      latestDiiCr = (latest.dii / 1e7).toFixed(2);
-    }
+    const fiiSum = sortedEntries.reduce(
+      (acc: number, [, v]: [string, any]) => acc + (v?.fii || 0),
+      0
+    );
+    const diiSum = sortedEntries.reduce(
+      (acc: number, [, v]: [string, any]) => acc + (v?.dii || 0),
+      0
+    );
+
+    // Convert from INR to Crores (1 Cr = 10^7)
+    fii7dCr = (fiiSum / 1e7).toFixed(2);
+    dii7dCr = (diiSum / 1e7).toFixed(2);
   }
 
   // Calculate average correlation
@@ -42,11 +51,11 @@ function MarketSummary() {
       <h3 className="text-xl font-bold mb-4">Market Summary</h3>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <div className="text-sm opacity-90 mb-1">FII Flows (latest day)</div>
+          <div className="text-sm opacity-90 mb-1">FII Flows (last 7 days)</div>
           <div className="text-2xl font-bold">
-            {latestFiiCr !== null ? (
-              <span={parseFloat(latestFiiCr) >= 0 ? 'text-green-300' : 'text-red-300'}>
-                ₹{latestFiiCr} Cr
+            {fii7dCr !== null ? (
+              <span className={parseFloat(fii7dCr) >= 0 ? 'text-green-300' : 'text-red-300'}>
+                ₹{fii7dCr} Cr
               </span>
             ) : (
               'N/A'
@@ -54,11 +63,11 @@ function MarketSummary() {
           </div>
         </div>
         <div>
-          <div className="text-sm opacity-90 mb-1">DII Flows (latest day)</div>
+          <div className="text-sm opacity-90 mb-1">DII Flows (last 7 days)</div>
           <div className="text-2xl font-bold">
-            {latestDiiCr !== null ? (
-              <span={parseFloat(latestDiiCr) >= 0 ? 'text-green-300' : 'text-red-300'}>
-                ₹{latestDiiCr} Cr
+            {dii7dCr !== null ? (
+              <span className={parseFloat(dii7dCr) >= 0 ? 'text-green-300' : 'text-red-300'}>
+                ₹{dii7dCr} Cr
               </span>
             ) : (
               'N/A'

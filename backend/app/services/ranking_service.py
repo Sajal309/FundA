@@ -119,7 +119,7 @@ def compute_sector_ranked_stocks(
             }
         }
     
-    # Query stocks with latest fundamentals
+    # Query stocks with latest fundamentals, filtered by sector mapping
     query = db.query(
         models.Stock,
         models.StockFundamentals
@@ -136,7 +136,10 @@ def compute_sector_ranked_stocks(
     results = query.all()
     
     if not results:
-        logger.warning(f"No stocks found for sector {sector_key}")
+        logger.warning(
+            f"No stocks found for sector '{sector_key}' with sector_ids={sector_ids} "
+            f"on latest_date={latest_date}"
+        )
         return {
             "rows": [],
             "columns": config.columns,
